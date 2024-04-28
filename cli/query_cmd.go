@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"slices"
 	"time"
 )
 
@@ -76,6 +77,8 @@ func QueryRun(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	slices.Reverse(logs)
 
 	for _, l := range logs {
 		for _, sender := range senders {
