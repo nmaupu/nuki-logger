@@ -1,6 +1,8 @@
 package messaging
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/rs/zerolog/log"
 )
 
@@ -13,6 +15,13 @@ type ConsoleSender struct {
 }
 
 func (c *ConsoleSender) Send(e *Event) error {
+	if e.Json {
+		bytes, err := json.Marshal(e.Log)
+		fmt.Println(string(bytes))
+		return err
+	}
+
+	// Regular output
 	values := e.GetValues(c.IncludeDate)
 	logger := log.With().Logger()
 	for k, v := range values {

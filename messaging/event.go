@@ -24,6 +24,7 @@ func (s *sender) GetName() string {
 type Event struct {
 	Prefix string
 	Log    model.NukiSmartlockLogResponse
+	Json   bool
 }
 
 func (e Event) GetValues(includeDate bool) map[string]string {

@@ -14,6 +14,7 @@ const (
 	FlagLimit    = "limit"
 	FlagFromDate = "from"
 	FlagToDate   = "to"
+	FlagJson     = "json"
 
 	FromDateTime = "fromDateTime"
 	ToDateTime   = "toDateTime"
@@ -58,6 +59,7 @@ func init() {
 	QueryCmd.Flags().IntP(FlagLimit, "l", 20, "Limits number of logs returned by the Nuki API (max: 50)")
 	QueryCmd.Flags().String(FlagFromDate, "", "Retrieve logs from this date (RFC3339")
 	QueryCmd.Flags().String(FlagToDate, "", "Retrieve logs to this date (RFC3339)")
+	QueryCmd.Flags().Bool(FlagJson, false, "Output results in json")
 
 	viper.BindPFlags(QueryCmd.Flags())
 }
@@ -77,7 +79,10 @@ func QueryRun(cmd *cobra.Command, args []string) error {
 
 	for _, l := range logs {
 		for _, sender := range senders {
-			if err := sender.Send(&messaging.Event{Log: l}); err != nil {
+			if err := sender.Send(&messaging.Event{
+				Log:  l,
+				Json: viper.GetBool(FlagJson),
+			}); err != nil {
 				log.Error().
 					Err(err).
 					Str("sender", sender.GetName()).
