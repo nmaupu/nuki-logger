@@ -15,6 +15,7 @@ type Sender interface {
 type sender struct {
 	Name        string `mapstructure:"-"`
 	IncludeDate bool   `mapstructure:"include_date"`
+	Timezone    string `mapstructure:"timezone"`
 }
 
 func (s *sender) GetName() string {
@@ -27,12 +28,22 @@ type Event struct {
 	Json   bool
 }
 
-func (e Event) GetValues(includeDate bool) map[string]string {
-	values := map[string]string{
-		"action":  e.Log.Action.String(),
-		"trigger": e.Log.Trigger.String(),
-		"state":   e.Log.State.String(),
-		"source":  e.Log.Source.String(),
+func (e Event) GetValues(includeDate, emoji bool, tz string) map[string]string {
+	var values map[string]string
+	if emoji {
+		values = map[string]string{
+			"action":  e.Log.Action.String(),
+			"trigger": e.Log.Trigger.GetEmoji(),
+			"state":   e.Log.State.GetEmoji(),
+			"source":  e.Log.Source.String(),
+		}
+	} else {
+		values = map[string]string{
+			"action":  e.Log.Action.String(),
+			"trigger": e.Log.Trigger.String(),
+			"state":   e.Log.State.String(),
+			"source":  e.Log.Source.String(),
+		}
 	}
 
 	if e.Log.Source == model.NukiSourceKeypadCode {
@@ -40,14 +51,18 @@ func (e Event) GetValues(includeDate bool) map[string]string {
 	}
 
 	if includeDate {
-		values["date"] = e.Log.Date.Format(time.RFC3339)
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			loc = time.UTC
+		}
+		values["date"] = e.Log.Date.In(loc).Format(time.DateTime)
 	}
 
 	return values
 }
 
-func (e Event) String(includeDate bool) string {
-	values := e.GetValues(includeDate)
+func (e Event) String(includeDate, emoji bool, tz string) string {
+	values := e.GetValues(includeDate, emoji, tz)
 	var valuesStr []string
 	for k, v := range values {
 		valuesStr = append(valuesStr, fmt.Sprintf("%s=%s", k, v))

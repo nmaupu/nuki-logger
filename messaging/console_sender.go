@@ -22,7 +22,7 @@ func (c *ConsoleSender) Send(e *Event) error {
 	}
 
 	// Regular output
-	values := e.GetValues(c.IncludeDate)
+	values := e.GetValues(c.IncludeDate, false, c.Timezone)
 	logger := log.With().Logger()
 	for k, v := range values {
 		logger = logger.With().Str(k, v).Logger()

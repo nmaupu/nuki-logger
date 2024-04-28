@@ -34,3 +34,27 @@ var (
 		NukiStateUnknownError:      "Unknown error",
 	}
 )
+
+func (n NukiState) GetEmoji() string {
+	switch n {
+	case NukiStateLowMotorVoltage:
+	case NukiStateMotorBlocked:
+	case NukiStateBusy:
+		return "⚠️"
+	case NukiStateWrongKeypadCode:
+		return "⛔️"
+	case NukiStateOtherError:
+	case NukiStateUnknownError:
+	case NukiStateRejectedNightMode:
+	case NukiStateRejected:
+	case NukiStateIncomplete:
+	case NukiStateCanceled:
+	case NukiStateClutchFailure:
+	case NukiStateTooRecent:
+	case NukiStateMotorPowerFailure:
+		return "❌"
+	case NukiStateSuccess:
+		return "✅"
+	}
+	return n.String()
+}

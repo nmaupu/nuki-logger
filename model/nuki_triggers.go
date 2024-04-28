@@ -24,3 +24,21 @@ var (
 		NukiTriggerKeypad:    "keypad",
 	}
 )
+
+func (n NukiTrigger) GetEmoji() string {
+	switch n {
+	case NukiTriggerSystem:
+		return "⚙️"
+	case NukiTriggerKeypad:
+		return "#️⃣"
+	case NukiTriggerApp:
+		return "📱"
+	case NukiTriggerWeb:
+		return "🌐"
+	case NukiTriggerButton:
+		return "🔘"
+	case NukiTriggerManual:
+		return "🖐"
+	}
+	return n.String()
+}
