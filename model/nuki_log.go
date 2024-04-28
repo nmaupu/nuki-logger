@@ -1,6 +1,7 @@
 package model
 
 import (
+	"slices"
 	"time"
 )
 
@@ -85,5 +86,6 @@ func Diff(new, old []NukiSmartlockLogResponse) []NukiSmartlockLogResponse {
 		diff = append(diff, r)
 	}
 
+	slices.Reverse(diff)
 	return diff
 }
