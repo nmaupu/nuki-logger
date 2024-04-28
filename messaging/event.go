@@ -13,7 +13,7 @@ type Sender interface {
 }
 
 type sender struct {
-	Name        string `mapstructure:"name"`
+	Name        string `mapstructure:"-"`
 	IncludeDate bool   `mapstructure:"include_date"`
 }
 

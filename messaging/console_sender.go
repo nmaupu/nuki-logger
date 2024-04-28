@@ -9,7 +9,7 @@ var (
 )
 
 type ConsoleSender struct {
-	sender
+	sender `mapstructure:",squash"`
 }
 
 func (c *ConsoleSender) Send(e *Event) error {

@@ -7,7 +7,7 @@ var (
 )
 
 type TelegramSender struct {
-	sender
+	sender `mapstructure:",squash"`
 	Token  string `mapstructure:"token"`
 	ChatID int64  `mapstructure:"chat_id"`
 }
