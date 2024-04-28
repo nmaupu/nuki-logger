@@ -3,10 +3,10 @@ package nukiapi
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/nmaupu/nuki-logger/model"
 	"github.com/rs/zerolog/log"
 	"io"
 	"net/http"
-	"nuki-logger/model"
 	"strings"
 	"time"
 )

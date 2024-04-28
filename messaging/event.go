@@ -2,7 +2,7 @@ package messaging
 
 import (
 	"fmt"
-	"nuki-logger/model"
+	"github.com/nmaupu/nuki-logger/model"
 	"strings"
 	"time"
 )

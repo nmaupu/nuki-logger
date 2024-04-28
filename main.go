@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/nmaupu/nuki-logger/cli"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"nuki-logger/cli"
 	"os"
 	"time"
 )

@@ -2,8 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/spf13/viper"
-	"nuki-logger/messaging"
 )
 
 type Config struct {

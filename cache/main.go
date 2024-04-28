@@ -3,7 +3,7 @@ package cache
 import (
 	"encoding/json"
 	"errors"
-	"nuki-logger/model"
+	"github.com/nmaupu/nuki-logger/model"
 	"os"
 )
 

@@ -2,10 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"nuki-logger/messaging"
 	"strings"
 )
 
@@ -31,6 +31,10 @@ var (
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if strings.Contains(cmd.CommandPath(), "version") {
+				return nil
+			}
+
 			var requiredFlagsMissing []string
 			for _, v := range requiredStringFlags {
 				if viper.GetString(v) == "" {
@@ -65,8 +69,9 @@ func init() {
 	RootCmd.PersistentFlags().StringP(PersistentFlagConfig, "c", "", "Configuration file")
 	RootCmd.PersistentFlags().StringSliceP(PersistentFlagSender, "s", []string{}, "Senders to send new logs to")
 
-	RootCmd.AddCommand(ServerCmd)
+	RootCmd.AddCommand(VersionCmd)
 	RootCmd.AddCommand(QueryCmd)
+	RootCmd.AddCommand(ServerCmd)
 
 	viper.AutomaticEnv()
 	viper.SetConfigName("config")

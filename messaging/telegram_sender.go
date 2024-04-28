@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/enescakir/emoji"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"nuki-logger/model"
+	"github.com/nmaupu/nuki-logger/model"
 	"time"
 )
 

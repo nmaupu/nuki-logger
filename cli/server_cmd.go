@@ -1,13 +1,13 @@
 package cli
 
 import (
+	"github.com/nmaupu/nuki-logger/cache"
+	"github.com/nmaupu/nuki-logger/messaging"
+	"github.com/nmaupu/nuki-logger/model"
+	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"nuki-logger/cache"
-	"nuki-logger/messaging"
-	"nuki-logger/model"
-	"nuki-logger/nukiapi"
 	"os"
 	"os/signal"
 	"sync"

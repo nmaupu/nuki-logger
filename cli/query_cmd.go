@@ -2,11 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"github.com/nmaupu/nuki-logger/messaging"
+	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"nuki-logger/messaging"
-	"nuki-logger/nukiapi"
 	"time"
 )
 
