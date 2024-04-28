@@ -24,10 +24,12 @@ func (sc *SenderConfig) GetSender() (messaging.Sender, error) {
 			return nil, fmt.Errorf("error creating telegram sender, token or chatid is not specified for %s", sc.Name)
 		}
 
+		sc.Telegram.Name = sc.Name
 		return sc.Telegram, nil
 	}
 
 	if sc.Console != nil {
+		sc.Console.Name = sc.Name
 		return sc.Console, nil
 	}
 

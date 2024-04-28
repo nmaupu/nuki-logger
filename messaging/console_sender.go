@@ -9,11 +9,11 @@ var (
 )
 
 type ConsoleSender struct {
-	IncludeDate bool `mapstructure:"include_date"`
+	sender
 }
 
-func (t *ConsoleSender) Send(e *Event) error {
-	values := e.GetValues(t.IncludeDate)
+func (c *ConsoleSender) Send(e *Event) error {
+	values := e.GetValues(c.IncludeDate)
 	logger := log.With().Logger()
 	for k, v := range values {
 		logger = logger.With().Str(k, v).Logger()

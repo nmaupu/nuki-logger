@@ -78,18 +78,12 @@ func RunServer(cmd *cobra.Command, args []string) error {
 				if len(diff) > 0 {
 					for _, d := range diff {
 						// log those new messages
-						for _, s := range config.Senders {
-							sender, err := s.GetSender()
-							if err != nil {
-								log.Error().
-									Err(err).
-									Msg("Unable to send message to sender")
-							}
-
+						for _, sender := range senders {
 							if err := sender.Send(&messaging.Event{Log: d}); err != nil {
 								log.Error().
 									Err(err).
-									Msgf("Unable to send message to sender %s", s.Name)
+									Str("sender", sender.GetName()).
+									Msg("Unable to send message to sender")
 							}
 						}
 					}

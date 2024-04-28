@@ -7,9 +7,9 @@ var (
 )
 
 type TelegramSender struct {
-	Token       string `mapstructure:"token"`
-	ChatID      int64  `mapstructure:"chat_id"`
-	IncludeDate bool   `mapstructure:"include_date"`
+	sender
+	Token  string `mapstructure:"token"`
+	ChatID int64  `mapstructure:"chat_id"`
 }
 
 func (t *TelegramSender) Send(e *Event) error {

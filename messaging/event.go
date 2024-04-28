@@ -9,6 +9,16 @@ import (
 
 type Sender interface {
 	Send(e *Event) error
+	GetName() string
+}
+
+type sender struct {
+	Name        string `mapstructure:"name"`
+	IncludeDate bool   `mapstructure:"include_date"`
+}
+
+func (s *sender) GetName() string {
+	return s.Name
 }
 
 type Event struct {
