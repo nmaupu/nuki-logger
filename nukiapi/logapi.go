@@ -13,11 +13,11 @@ import (
 
 const (
 	NukiApi         = "https://api.nuki.io"
-	NukiLogEndpoint = "smartlock/%s/log"
+	NukiLogEndpoint = "smartlock/%d/log"
 )
 
 type LogsReader struct {
-	SmartlockID string
+	SmartlockID int64
 	Token       string
 	Limit       int
 	FromDate    time.Time
@@ -25,7 +25,7 @@ type LogsReader struct {
 }
 
 func (r LogsReader) Execute() ([]model.NukiSmartlockLogResponse, error) {
-	if r.SmartlockID == "" {
+	if r.SmartlockID == 0 {
 		return nil, fmt.Errorf("smartlockid is mandatory")
 	}
 	if r.Token == "" {
@@ -71,6 +71,10 @@ func (r LogsReader) Execute() ([]model.NukiSmartlockLogResponse, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("error while querying Nuki API (status: %s): %s", resp.Status, string(body))
 	}
 
 	var logResponses []model.NukiSmartlockLogResponse

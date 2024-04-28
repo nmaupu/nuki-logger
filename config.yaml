@@ -1,0 +1,12 @@
+---
+smartlock_id: 12345
+nuki_api_token: token
+senders:
+  - name: telegram
+    telegram:
+      token: token
+      chat_id: 12345
+      include_date: true
+  - name: console
+    console:
+      include_date: true

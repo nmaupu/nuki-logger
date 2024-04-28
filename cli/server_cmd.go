@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"nuki-logger/cache"
+	"nuki-logger/messaging"
 	"nuki-logger/model"
 	"nuki-logger/nukiapi"
 	"os"
@@ -38,12 +39,10 @@ func RunServer(cmd *cobra.Command, args []string) error {
 	ticker := time.NewTicker(viper.GetDuration(FlagServerInterval))
 	interruptSigChan := make(chan os.Signal, 1)
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
-	smartlockID := viper.GetString(PersistentFlagSmartlockID)
-	token := viper.GetString(PersistentFlagToken)
 
 	logsReader := nukiapi.LogsReader{
-		SmartlockID: smartlockID,
-		Token:       token,
+		SmartlockID: config.SmartlockID,
+		Token:       config.NukiAPIToken,
 		Limit:       30,
 	}
 
@@ -79,14 +78,20 @@ func RunServer(cmd *cobra.Command, args []string) error {
 				if len(diff) > 0 {
 					for _, d := range diff {
 						// log those new messages
-						log.Info().
-							Time("date", d.Date).
-							Str("source", d.Source.String()).
-							Str("action", d.Action.String()).
-							Str("state", d.State.String()).
-							Str("trigger", d.Trigger.String()).
-							Str("name", d.Name).
-							Msg("New log")
+						for _, s := range config.Senders {
+							sender, err := s.GetSender()
+							if err != nil {
+								log.Error().
+									Err(err).
+									Msg("Unable to send message to sender")
+							}
+
+							if err := sender.Send(&messaging.Event{Log: d}); err != nil {
+								log.Error().
+									Err(err).
+									Msgf("Unable to send message to sender %s", s.Name)
+							}
+						}
 					}
 
 					cacheLogs = newResponses

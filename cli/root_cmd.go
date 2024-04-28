@@ -9,22 +9,22 @@ import (
 )
 
 const (
-	EnvVarsPrefix             = "NUKI_LOGGER"
-	PersistentFlagToken       = "token"
-	PersistentFlagSmartlockID = "smartlockid"
+	PersistentFlagConfig = "config"
 )
 
 var (
 	requiredFlags = []string{
-		PersistentFlagToken,
-		PersistentFlagSmartlockID,
+		PersistentFlagConfig,
 	}
+
+	config = Config{}
+
 	RootCmd = &cobra.Command{
 		Use:           "nuki-logger",
 		Short:         "Query Nuki api for most recent logs",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			var requiredFlagsMissing []string
 			for _, v := range requiredFlags {
 				if viper.GetString(v) == "" {
@@ -36,25 +36,32 @@ var (
 				return fmt.Errorf("the following flag(s) are required: %s", strings.Join(requiredFlagsMissing, ", "))
 			}
 
-			return nil
+			if viper.GetString(PersistentFlagConfig) != "" {
+				viper.SetConfigName(viper.GetString(PersistentFlagConfig))
+			}
+
+			return config.LoadConfig(viper.GetViper())
 		},
 		RunE: run,
 	}
 )
 
 func init() {
-	RootCmd.PersistentFlags().StringP(PersistentFlagSmartlockID, "s", "", "Smartlock ID to get the logs from")
-	RootCmd.PersistentFlags().StringP(PersistentFlagToken, "t", "", "Token to access the Nuki API")
+	RootCmd.PersistentFlags().StringP(PersistentFlagConfig, "c", "", "Configuration file")
 
 	RootCmd.AddCommand(ServerCmd)
 	RootCmd.AddCommand(QueryCmd)
 
 	viper.AutomaticEnv()
-	viper.SetEnvPrefix(EnvVarsPrefix)
-	_ = viper.BindPFlags(RootCmd.PersistentFlags())
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.BindPFlags(RootCmd.PersistentFlags())
 }
 
 func run(_ *cobra.Command, _ []string) error {
+	log.Debug().
+		Msg(fmt.Sprintf("%+v", config))
 	log.Error().
 		Err(fmt.Errorf("please use one of the supported sub-command")).
 		Send()
