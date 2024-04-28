@@ -13,11 +13,11 @@ const (
 	NukiLogEndpoint = "smartlock/%s/log"
 )
 
-func ReadLog(smartlockID, apiToken string) error {
+func ReadLogs(smartlockID, apiToken string) ([]model.NukiSmartlockLogResponse, error) {
 	requestURL := fmt.Sprintf("%s/%s", NukiApi, fmt.Sprintf(NukiLogEndpoint, smartlockID))
-	httpReq, err := http.NewRequest(http.MethodGet, requestURL+"?limit=50", nil)
+	httpReq, err := http.NewRequest(http.MethodGet, requestURL+"?limit=30", nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	httpReq.Header = http.Header{
 		"Content-Type":  {"application/json"},
@@ -26,42 +26,19 @@ func ReadLog(smartlockID, apiToken string) error {
 	client := http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var logResponses []model.NukiSmartlockLogResponse
 	err = json.Unmarshal(body, &logResponses)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, logResponse := range logResponses {
-		if logResponse.Source == model.NukiSourceKeypadCode {
-			fmt.Printf("%s - deviceType=%s, action=%s, trigger=%s, state=%s, source=%s, name=%s\n",
-				logResponse.Date,
-				logResponse.DeviceType,
-				logResponse.Action,
-				logResponse.Trigger,
-				logResponse.State,
-				logResponse.Source,
-				logResponse.Name,
-			)
-		} else {
-			fmt.Printf("%s - deviceType=%s, action=%s, trigger=%s, state=%s, source=%s\n",
-				logResponse.Date,
-				logResponse.DeviceType,
-				logResponse.Action,
-				logResponse.Trigger,
-				logResponse.State,
-				logResponse.Source,
-			)
-		}
-	}
-
-	return nil
+	return logResponses, err
 }

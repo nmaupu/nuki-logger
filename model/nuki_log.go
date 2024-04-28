@@ -58,3 +58,32 @@ func (n NukiSource) String() string {
 	}
 	return str
 }
+
+func (n NukiSmartlockLogResponse) Equals(n2 NukiSmartlockLogResponse) bool {
+	return n.ID == n2.ID
+}
+
+// Diff returns new NukiSmartlockLogResponse from new not present in old
+func Diff(new, old []NukiSmartlockLogResponse) []NukiSmartlockLogResponse {
+	if len(new) == 0 {
+		return []NukiSmartlockLogResponse{}
+	}
+	if len(old) == 0 {
+		return new
+	}
+
+	if new[0].Equals(old[0]) { // no new logs
+		return []NukiSmartlockLogResponse{}
+	}
+
+	var diff []NukiSmartlockLogResponse
+	for _, r := range new {
+		// While not equals the first old, adding this new log
+		if r.Equals(old[0]) {
+			break
+		}
+		diff = append(diff, r)
+	}
+
+	return diff
+}
