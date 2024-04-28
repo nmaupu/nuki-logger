@@ -1,5 +1,7 @@
 package model
 
+import "github.com/enescakir/emoji"
+
 type NukiState int32
 
 var (
@@ -40,21 +42,22 @@ func (n NukiState) GetEmoji() string {
 	case NukiStateLowMotorVoltage:
 	case NukiStateMotorBlocked:
 	case NukiStateBusy:
-		return "⚠️"
+	case NukiStateTooRecent:
+		return emoji.Warning.String()
 	case NukiStateWrongKeypadCode:
-		return "⛔️"
-	case NukiStateOtherError:
-	case NukiStateUnknownError:
 	case NukiStateRejectedNightMode:
 	case NukiStateRejected:
-	case NukiStateIncomplete:
-	case NukiStateCanceled:
+		return emoji.RedCircle.String()
+	case NukiStateOtherError:
+	case NukiStateUnknownError:
 	case NukiStateClutchFailure:
-	case NukiStateTooRecent:
 	case NukiStateMotorPowerFailure:
-		return "❌"
+		return emoji.ExclamationMark.String()
+	case NukiStateCanceled:
+	case NukiStateIncomplete:
+		return emoji.HollowRedCircle.String()
 	case NukiStateSuccess:
-		return "✅"
+		return emoji.GreenCircle.String()
 	}
 	return n.String()
 }

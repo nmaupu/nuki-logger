@@ -31,10 +31,10 @@ var (
 
 func init() {
 	ServerCmd.Flags().DurationP(FlagServerInterval, "i", time.Second*60, "Interval at which to check new logs")
-	viper.BindPFlags(ServerCmd.Flags())
+	_ = viper.BindPFlags(ServerCmd.Flags())
 }
 
-func RunServer(cmd *cobra.Command, args []string) error {
+func RunServer(_ *cobra.Command, _ []string) error {
 	log.Debug().Dur(FlagServerInterval, viper.GetDuration(FlagServerInterval)).Send()
 	ticker := time.NewTicker(viper.GetDuration(FlagServerInterval))
 	interruptSigChan := make(chan os.Signal, 1)
@@ -43,7 +43,7 @@ func RunServer(cmd *cobra.Command, args []string) error {
 	logsReader := nukiapi.LogsReader{
 		SmartlockID: config.SmartlockID,
 		Token:       config.NukiAPIToken,
-		Limit:       30,
+		Limit:       20,
 	}
 
 	log.Info().Msg("Reading old log responses from cache")
@@ -58,7 +58,9 @@ func RunServer(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		cache.SaveCacheToDisk(cacheLogs)
+		if err := cache.SaveCacheToDisk(cacheLogs); err != nil {
+			return err
+		}
 	}
 
 	wg := sync.WaitGroup{}
@@ -89,7 +91,9 @@ func RunServer(cmd *cobra.Command, args []string) error {
 					}
 
 					cacheLogs = newResponses
-					cache.SaveCacheToDisk(cacheLogs)
+					if err := cache.SaveCacheToDisk(cacheLogs); err != nil {
+						log.Error().Err(err).Msg("Unable to save cache file to disk")
+					}
 				}
 			case <-interruptSigChan:
 				log.Info().Msg("Stopping.")

@@ -5,6 +5,7 @@ go 1.22
 require github.com/spf13/cobra v1.8.0
 
 require (
+	github.com/enescakir/emoji v1.0.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

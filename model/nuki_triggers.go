@@ -1,5 +1,7 @@
 package model
 
+import "github.com/enescakir/emoji"
+
 type NukiTrigger int32
 
 var (
@@ -28,17 +30,17 @@ var (
 func (n NukiTrigger) GetEmoji() string {
 	switch n {
 	case NukiTriggerSystem:
-		return "⚙️"
+		return emoji.Gear.String()
 	case NukiTriggerKeypad:
-		return "#️⃣"
+		return emoji.InputNumbers.String()
 	case NukiTriggerApp:
-		return "📱"
+		return emoji.MobilePhone.String()
 	case NukiTriggerWeb:
-		return "🌐"
+		return emoji.GlobeShowingEuropeAfrica.String()
 	case NukiTriggerButton:
-		return "🔘"
+		return emoji.RadioButton.String()
 	case NukiTriggerManual:
-		return "🖐"
+		return emoji.HandWithFingersSplayed.String()
 	}
 	return n.String()
 }
