@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	FlagServerInterval = "interval"
+	FlagServerInterval     = "interval"
+	SmartlockCheckInterval = time.Hour * 2
 )
 
 var (
@@ -37,6 +38,7 @@ func init() {
 func RunServer(_ *cobra.Command, _ []string) error {
 	log.Debug().Dur(FlagServerInterval, viper.GetDuration(FlagServerInterval)).Send()
 	tickerLogs := time.NewTicker(viper.GetDuration(FlagServerInterval))
+	tickerSmartlock := time.NewTicker(SmartlockCheckInterval)
 	interruptSigChan := make(chan os.Signal, 1)
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
 
@@ -44,6 +46,10 @@ func RunServer(_ *cobra.Command, _ []string) error {
 		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
 		SmartlockID: config.SmartlockID,
 		Limit:       20,
+	}
+	smartlockReader := nukiapi.SmartlockReader{
+		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
+		SmartlockID: config.SmartlockID,
 	}
 
 	log.Info().Msg("Reading old log responses from cache")
@@ -69,6 +75,28 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	go func() {
 		for {
 			select {
+			case <-tickerSmartlock.C:
+				log.Info().Msg("Checking smartlock for issues")
+				resp, err := smartlockReader.Execute()
+				if err != nil {
+					log.Error().Err(err).Msg("Unable to check smartlock")
+				}
+				if resp.State.BatteryCritical ||
+					resp.State.KeypadBatteryCritical ||
+					resp.State.DoorsensorBatteryCritical ||
+					resp.State.BatteryCharge <= 30 {
+					for _, sender := range senders {
+						if err := sender.Send(&messaging.Event{
+							Smartlock: *resp,
+						}); err != nil {
+							log.Error().
+								Err(err).
+								Str("sender", sender.GetName()).
+								Msg("Unable to send message to sender")
+						}
+					}
+				}
+
 			case <-tickerLogs.C:
 				log.Info().Msg("Getting logs from api")
 
@@ -110,6 +138,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			case <-interruptSigChan:
 				log.Info().Msg("Stopping.")
 				tickerLogs.Stop()
+				tickerSmartlock.Stop()
 				wg.Done()
 			}
 		}

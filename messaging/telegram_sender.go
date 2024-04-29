@@ -27,34 +27,79 @@ func (t *TelegramSender) Send(e *Event) error {
 	var msg string
 
 	if e.Json {
-		bytes, err := json.Marshal(e.Log)
-		if err != nil {
-			return err
-		}
-		msg = string(bytes)
-	} else {
-		var date string
-		if t.IncludeDate {
-			loc, err := time.LoadLocation(t.Timezone)
+		if e.IsLogEvent() {
+			bytes, err := json.Marshal(e.Log)
 			if err != nil {
-				loc = time.UTC
+				return err
 			}
-			date = e.Log.Date.In(loc).Format(time.DateTime) + " - "
-		}
-		if e.Log.Trigger == model.NukiTriggerButton {
-			// Lock / unlock with button
-			msg = fmt.Sprintf("%s%s %s %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji())
-		} else if e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceKeypadCode {
-			// Someone enters keypad code
-			msg = fmt.Sprintf("%s%s %s by '%s' %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.ReservationName, e.Log.State.GetEmoji())
-		} else if e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceDefault {
-			// < keypad button is pressed
-			msg = fmt.Sprintf("%s%s %s %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji())
-		} else if e.Log.Trigger == model.NukiTriggerSystem && (e.Log.Action == model.NukiActionDoorOpened || e.Log.Action == model.NukiActionDoorClosed) {
-			// door opened / closed
-			msg = fmt.Sprintf("%s%s %s %s", date, emoji.Door.String(), e.Log.Action.String(), e.Log.State.GetEmoji())
+			msg = string(bytes)
+		} else if e.IsSmartlockEvent() {
+			bytes, err := json.Marshal(e.Smartlock.ToSmartlockState())
+			if err != nil {
+				return err
+			}
+			msg = string(bytes)
 		} else {
-			msg = e.String(t.IncludeDate, true, t.Timezone)
+			return fmt.Errorf("unable to determine the type of event to send")
+		}
+	} else {
+		if e.IsLogEvent() {
+			var date string
+			if t.IncludeDate {
+				loc, err := time.LoadLocation(t.Timezone)
+				if err != nil {
+					loc = time.UTC
+				}
+				date = e.Log.Date.In(loc).Format(time.DateTime) + " - "
+			}
+			if e.Log.Trigger == model.NukiTriggerButton {
+				// Lock / unlock with button
+				msg = fmt.Sprintf("%s%s %s %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji())
+			} else if e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceKeypadCode {
+				// Someone enters keypad code
+				msg = fmt.Sprintf("%s%s %s by '%s' %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.ReservationName, e.Log.State.GetEmoji())
+			} else if e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceDefault {
+				// < keypad button is pressed
+				msg = fmt.Sprintf("%s%s %s %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji())
+			} else if e.Log.Trigger == model.NukiTriggerSystem && (e.Log.Action == model.NukiActionDoorOpened || e.Log.Action == model.NukiActionDoorClosed) {
+				// door opened / closed
+				msg = fmt.Sprintf("%s%s %s %s", date, emoji.Door.String(), e.Log.Action.String(), e.Log.State.GetEmoji())
+			} else {
+				msg = e.String(t.IncludeDate, true, t.Timezone)
+			}
+		} else if e.IsSmartlockEvent() {
+			smartlockState := e.Smartlock.ToSmartlockState()
+			ok := emoji.GreenCircle
+			warn := emoji.OrangeCircle
+			crit := emoji.RedCircle
+			eBattery := ok
+			eBatteryKeypad := ok
+			eBatteryDoorsensor := ok
+
+			if smartlockState.BatteryCritical {
+				eBattery = crit
+			} else if smartlockState.BatteryCharge < 20 {
+				eBattery = crit
+			} else if smartlockState.BatteryCharge <= 30 {
+				eBattery = warn
+			}
+
+			if smartlockState.KeypadBatteryCritical {
+				eBatteryKeypad = crit
+			}
+
+			if smartlockState.DoorsensorBatteryCritical {
+				eBatteryDoorsensor = crit
+			}
+
+			msg = fmt.Sprintf("Smartlock %s\nBattery pack: %s (%d%%)\nKeypad: %s\nDoor sensor: %s",
+				smartlockState.Name,
+				eBattery, smartlockState.BatteryCharge,
+				eBatteryKeypad,
+				eBatteryDoorsensor,
+			)
+		} else {
+			return fmt.Errorf("unable to determine the type of event to send")
 		}
 	}
 

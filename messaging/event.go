@@ -26,7 +26,16 @@ type Event struct {
 	Prefix          string
 	Log             model.NukiSmartlockLogResponse
 	ReservationName string
+	Smartlock       model.SmartlockResponse
 	Json            bool
+}
+
+func (e Event) IsLogEvent() bool {
+	return e.Log.ID != ""
+}
+
+func (e Event) IsSmartlockEvent() bool {
+	return e.Smartlock.SmartlockId != 0
 }
 
 func (e Event) GetValues(includeDate, emoji bool, tz string) map[string]string {
