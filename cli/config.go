@@ -9,6 +9,7 @@ import (
 type Config struct {
 	SmartlockID  int64          `mapstructure:"smartlock_id"`
 	NukiAPIToken string         `mapstructure:"nuki_api_token"`
+	AddressID    int64          `mapstructure:"address_id"`
 	Senders      []SenderConfig `mapstructure:"senders"`
 }
 

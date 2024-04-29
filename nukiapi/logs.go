@@ -11,14 +11,9 @@ import (
 	"time"
 )
 
-const (
-	NukiApi         = "https://api.nuki.io"
-	NukiLogEndpoint = "smartlock/%d/log"
-)
-
 type LogsReader struct {
+	APICaller
 	SmartlockID int64
-	Token       string
 	Limit       int
 	FromDate    time.Time
 	ToDate      time.Time
@@ -46,8 +41,8 @@ func (r LogsReader) Execute() ([]model.NukiSmartlockLogResponse, error) {
 	}
 
 	requestURL := fmt.Sprintf("%s/%s?%s",
-		NukiApi,
-		fmt.Sprintf(NukiLogEndpoint, r.SmartlockID),
+		Api,
+		fmt.Sprintf(LogsEndpoint, r.SmartlockID),
 		strings.Join(getParams, "&"))
 
 	log.Debug().
@@ -77,11 +72,11 @@ func (r LogsReader) Execute() ([]model.NukiSmartlockLogResponse, error) {
 		return nil, fmt.Errorf("error while querying Nuki API (status: %s): %s", resp.Status, string(body))
 	}
 
-	var logResponses []model.NukiSmartlockLogResponse
-	err = json.Unmarshal(body, &logResponses)
+	var responses []model.NukiSmartlockLogResponse
+	err = json.Unmarshal(body, &responses)
 	if err != nil {
 		return nil, err
 	}
 
-	return logResponses, err
+	return responses, err
 }

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"github.com/nmaupu/nuki-logger/messaging"
+	"github.com/nmaupu/nuki-logger/model"
 	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -65,10 +66,10 @@ func init() {
 	viper.BindPFlags(QueryCmd.Flags())
 }
 
-func QueryRun(cmd *cobra.Command, args []string) error {
+func QueryRun(_ *cobra.Command, _ []string) error {
 	nukiLogsReader := nukiapi.LogsReader{
 		SmartlockID: config.SmartlockID,
-		Token:       config.NukiAPIToken,
+		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
 		Limit:       viper.GetInt(FlagLimit),
 		FromDate:    viper.GetTime(FromDateTime),
 		ToDate:      viper.GetTime(ToDateTime),
@@ -82,9 +83,18 @@ func QueryRun(cmd *cobra.Command, args []string) error {
 
 	for _, l := range logs {
 		for _, sender := range senders {
+			reservationName := l.Name
+			if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
+				reservationName, err = getReservationName(l.Name, &config)
+				if err != nil {
+					log.Error().Err(err).Msg("Unable to get reservation's name")
+				}
+			}
+
 			if err := sender.Send(&messaging.Event{
-				Log:  l,
-				Json: viper.GetBool(FlagJson),
+				Log:             l,
+				ReservationName: reservationName,
+				Json:            viper.GetBool(FlagJson),
 			}); err != nil {
 				log.Error().
 					Err(err).

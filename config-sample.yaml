@@ -1,4 +1,5 @@
 ---
+address_id: 12345
 smartlock_id: 12345
 nuki_api_token: token
 senders:

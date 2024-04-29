@@ -23,9 +23,10 @@ func (s *sender) GetName() string {
 }
 
 type Event struct {
-	Prefix string
-	Log    model.NukiSmartlockLogResponse
-	Json   bool
+	Prefix          string
+	Log             model.NukiSmartlockLogResponse
+	ReservationName string
+	Json            bool
 }
 
 func (e Event) GetValues(includeDate, emoji bool, tz string) map[string]string {
@@ -47,7 +48,8 @@ func (e Event) GetValues(includeDate, emoji bool, tz string) map[string]string {
 	}
 
 	if e.Log.Source == model.NukiSourceKeypadCode {
-		values["name"] = e.Log.Name
+		values["reference"] = e.Log.Name
+		values["name"] = e.ReservationName
 	}
 
 	if includeDate {

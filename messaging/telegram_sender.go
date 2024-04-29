@@ -46,7 +46,7 @@ func (t *TelegramSender) Send(e *Event) error {
 			msg = fmt.Sprintf("%s%s %s %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji())
 		} else if e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceKeypadCode {
 			// Someone enters keypad code
-			msg = fmt.Sprintf("%s%s %s by '%s' %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.Name, e.Log.State.GetEmoji())
+			msg = fmt.Sprintf("%s%s %s by '%s' %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.ReservationName, e.Log.State.GetEmoji())
 		} else if e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceDefault {
 			// < keypad button is pressed
 			msg = fmt.Sprintf("%s%s %s %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji())

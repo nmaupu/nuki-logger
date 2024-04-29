@@ -36,13 +36,13 @@ func init() {
 
 func RunServer(_ *cobra.Command, _ []string) error {
 	log.Debug().Dur(FlagServerInterval, viper.GetDuration(FlagServerInterval)).Send()
-	ticker := time.NewTicker(viper.GetDuration(FlagServerInterval))
+	tickerLogs := time.NewTicker(viper.GetDuration(FlagServerInterval))
 	interruptSigChan := make(chan os.Signal, 1)
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	logsReader := nukiapi.LogsReader{
+		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
 		SmartlockID: config.SmartlockID,
-		Token:       config.NukiAPIToken,
 		Limit:       20,
 	}
 
@@ -65,10 +65,11 @@ func RunServer(_ *cobra.Command, _ []string) error {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+
 	go func() {
 		for {
 			select {
-			case <-ticker.C:
+			case <-tickerLogs.C:
 				log.Info().Msg("Getting logs from api")
 
 				newResponses, err := logsReader.Execute()
@@ -79,9 +80,20 @@ func RunServer(_ *cobra.Command, _ []string) error {
 				diff := model.Diff(newResponses, cacheLogs)
 				if len(diff) > 0 {
 					for _, d := range diff {
+						reservationName := d.Name
+						if d.Trigger == model.NukiTriggerKeypad && d.Source == model.NukiSourceKeypadCode && d.State != model.NukiStateWrongKeypadCode {
+							reservationName, err = getReservationName(d.Name, &config)
+							if err != nil {
+								log.Error().Err(err).Msg("Unable to get reservation's name")
+							}
+						}
+
 						// log those new messages
 						for _, sender := range senders {
-							if err := sender.Send(&messaging.Event{Log: d}); err != nil {
+							if err := sender.Send(&messaging.Event{
+								Log:             d,
+								ReservationName: reservationName,
+							}); err != nil {
 								log.Error().
 									Err(err).
 									Str("sender", sender.GetName()).
@@ -97,7 +109,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 				}
 			case <-interruptSigChan:
 				log.Info().Msg("Stopping.")
-				ticker.Stop()
+				tickerLogs.Stop()
 				wg.Done()
 			}
 		}
