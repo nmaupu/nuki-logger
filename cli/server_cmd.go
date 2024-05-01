@@ -1,16 +1,19 @@
 package cli
 
 import (
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/nmaupu/nuki-logger/cache"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/model"
 	"github.com/nmaupu/nuki-logger/nukiapi"
+	"github.com/nmaupu/nuki-logger/telegrambot"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -29,6 +32,9 @@ var (
 		SilenceErrors: true,
 		RunE:          RunServer,
 	}
+
+	logsReader      nukiapi.LogsReader
+	smartlockReader nukiapi.SmartlockReader
 )
 
 func init() {
@@ -43,12 +49,12 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	interruptSigChan := make(chan os.Signal, 1)
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	logsReader := nukiapi.LogsReader{
+	logsReader = nukiapi.LogsReader{
 		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
 		SmartlockID: config.SmartlockID,
 		Limit:       20,
 	}
-	smartlockReader := nukiapi.SmartlockReader{
+	smartlockReader = nukiapi.SmartlockReader{
 		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
 		SmartlockID: config.SmartlockID,
 	}
@@ -71,7 +77,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	}
 
 	if config.TelegramBot.Enabled {
-		if err := runTelegramBot(smartlockReader); err != nil {
+		if err := runTelegramBot(); err != nil {
 			return err
 		}
 	}
@@ -158,51 +164,35 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runTelegramBot(smartlockReader nukiapi.SmartlockReader) error {
+func runTelegramBot() error {
 	tgSenderInterface, err := config.GetSender(config.TelegramBot.SenderName)
 	if err != nil {
 		return err
 	}
 	tgSender := tgSenderInterface.(*messaging.TelegramSender)
-	tgbot, err := tgbotapi.NewBotAPI(tgSender.Token)
-	if err != nil {
-		return err
+
+	commandNames := []string{
+		"/help",
+		"/battery",
+		"/code",
 	}
-	tgbot.Debug = false
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates, err := tgbot.GetUpdatesChan(u)
-	if err != nil {
-		return err
+	commands := telegrambot.Commands{}
+	commands["help"] = func(msg *tgbotapi.MessageConfig) {
+		msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(commandNames, ", "))
 	}
-	go func() {
-		for update := range updates {
-			if update.Message == nil {
-				continue
-			}
-			if !update.Message.IsCommand() {
-				continue
-			}
-
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
-
-			switch update.Message.Command() {
-			case "help":
-				msg.Text = "I understand /battery."
-			case "bat", "battery":
-				res, err := smartlockReader.Execute()
-				if err != nil {
-					log.Error().Err(err).Msg("Unable to read smartlock status from API")
-					continue
-				}
-				msg.Text = res.PrettyFormat()
-			default:
-				msg.Text = "Unknown command."
-			}
-
-			msg.ReplyToMessageID = update.Message.MessageID
-			tgbot.Send(msg)
+	fBattery := func(msg *tgbotapi.MessageConfig) {
+		res, err := smartlockReader.Execute()
+		if err != nil {
+			msg.Text = fmt.Sprintf("Unable to read smartlock status from API, err=%v", err)
+		} else {
+			msg.Text = res.PrettyFormat()
 		}
-	}()
-	return nil
+	}
+	commands["battery"] = fBattery
+	commands["bat"] = fBattery
+	commands["code"] = func(msg *tgbotapi.MessageConfig) {
+		msg.Text = "Not implemented yet."
+	}
+
+	return commands.Start(tgSender)
 }

@@ -68,6 +68,8 @@ func (t *TelegramSender) Send(e *Event) error {
 			} else if e.Log.Trigger == model.NukiTriggerSystem && (e.Log.Action == model.NukiActionDoorOpened || e.Log.Action == model.NukiActionDoorClosed) {
 				// door opened / closed
 				msg = fmt.Sprintf("%s%s %s %s", date, emoji.Door.String(), e.Log.Action.String(), e.Log.State.GetEmoji())
+			} else if e.Log.Trigger == model.NukiTriggerManual {
+				msg = fmt.Sprintf("%s%s %s %s", date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji())
 			} else {
 				msg = e.String(t.IncludeDate, true, t.Timezone)
 			}
