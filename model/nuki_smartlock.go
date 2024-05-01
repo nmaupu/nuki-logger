@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"fmt"
+	"github.com/enescakir/emoji"
+	"time"
+)
 
 type SmartLockState struct {
 	Name                      string `json:"name"`
@@ -100,4 +104,37 @@ func (s SmartlockResponse) ToSmartlockState() SmartLockState {
 		KeypadBatteryCritical:     s.State.KeypadBatteryCritical,
 		DoorsensorBatteryCritical: s.State.DoorsensorBatteryCritical,
 	}
+}
+
+func (s SmartlockResponse) PrettyFormat() string {
+	smartlockState := s.ToSmartlockState()
+	ok := emoji.GreenCircle
+	warn := emoji.OrangeCircle
+	crit := emoji.RedCircle
+	eBattery := ok
+	eBatteryKeypad := ok
+	eBatteryDoorsensor := ok
+
+	if smartlockState.BatteryCritical {
+		eBattery = crit
+	} else if smartlockState.BatteryCharge < 20 {
+		eBattery = crit
+	} else if smartlockState.BatteryCharge <= 30 {
+		eBattery = warn
+	}
+
+	if smartlockState.KeypadBatteryCritical {
+		eBatteryKeypad = crit
+	}
+
+	if smartlockState.DoorsensorBatteryCritical {
+		eBatteryDoorsensor = crit
+	}
+
+	return fmt.Sprintf("Smartlock %s\nBattery pack: %s (%d%%)\nKeypad: %s\nDoor sensor: %s",
+		smartlockState.Name,
+		eBattery, smartlockState.BatteryCharge,
+		eBatteryKeypad,
+		eBatteryDoorsensor,
+	)
 }

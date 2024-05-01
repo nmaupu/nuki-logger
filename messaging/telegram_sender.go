@@ -68,36 +68,7 @@ func (t *TelegramSender) Send(e *Event) error {
 				msg = e.String(t.IncludeDate, true, t.Timezone)
 			}
 		} else if e.IsSmartlockEvent() {
-			smartlockState := e.Smartlock.ToSmartlockState()
-			ok := emoji.GreenCircle
-			warn := emoji.OrangeCircle
-			crit := emoji.RedCircle
-			eBattery := ok
-			eBatteryKeypad := ok
-			eBatteryDoorsensor := ok
-
-			if smartlockState.BatteryCritical {
-				eBattery = crit
-			} else if smartlockState.BatteryCharge < 20 {
-				eBattery = crit
-			} else if smartlockState.BatteryCharge <= 30 {
-				eBattery = warn
-			}
-
-			if smartlockState.KeypadBatteryCritical {
-				eBatteryKeypad = crit
-			}
-
-			if smartlockState.DoorsensorBatteryCritical {
-				eBatteryDoorsensor = crit
-			}
-
-			msg = fmt.Sprintf("Smartlock %s\nBattery pack: %s (%d%%)\nKeypad: %s\nDoor sensor: %s",
-				smartlockState.Name,
-				eBattery, smartlockState.BatteryCharge,
-				eBatteryKeypad,
-				eBatteryDoorsensor,
-			)
+			msg = e.Smartlock.PrettyFormat()
 		} else {
 			return fmt.Errorf("unable to determine the type of event to send")
 		}

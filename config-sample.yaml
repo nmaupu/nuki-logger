@@ -2,6 +2,9 @@
 address_id: 12345
 smartlock_id: 12345
 nuki_api_token: token
+telegram_bot:
+  enabled: true
+  sender_name: telegram
 senders:
   - name: telegram
     telegram:

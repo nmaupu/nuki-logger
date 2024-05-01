@@ -11,6 +11,10 @@ type Config struct {
 	NukiAPIToken string         `mapstructure:"nuki_api_token"`
 	AddressID    int64          `mapstructure:"address_id"`
 	Senders      []SenderConfig `mapstructure:"senders"`
+	TelegramBot  struct {
+		Enabled    bool   `mapstructure:"enabled"`
+		SenderName string `mapstructure:"sender_name"`
+	} `mapstructure:"telegram_bot"`
 }
 
 type SenderConfig struct {
