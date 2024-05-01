@@ -83,11 +83,15 @@ func QueryRun(_ *cobra.Command, _ []string) error {
 
 	for _, l := range logs {
 		for _, sender := range senders {
-			reservationName := l.Name
+			var reservationName string
 			if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
 				reservationName, err = getReservationName(l.Name, &config)
 				if err != nil {
-					log.Error().Err(err).Msg("Unable to get reservation's name")
+					log.Error().
+						Err(err).
+						Str("ref", l.Name).
+						Msg("Unable to get reservation's name, keeping original ref as name")
+					reservationName = l.Name
 				}
 			}
 

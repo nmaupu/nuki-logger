@@ -114,11 +114,15 @@ func RunServer(_ *cobra.Command, _ []string) error {
 				diff := model.Diff(newResponses, cacheLogs)
 				if len(diff) > 0 {
 					for _, d := range diff {
-						reservationName := d.Name
+						var reservationName string
 						if d.Trigger == model.NukiTriggerKeypad && d.Source == model.NukiSourceKeypadCode && d.State != model.NukiStateWrongKeypadCode {
 							reservationName, err = getReservationName(d.Name, &config)
 							if err != nil {
-								log.Error().Err(err).Msg("Unable to get reservation's name")
+								log.Error().
+									Err(err).
+									Str("ref", d.Name).
+									Msg("Unable to get reservation's name, keeping original ref as name")
+								reservationName = d.Name
 							}
 						}
 
@@ -185,8 +189,7 @@ func runTelegramBot(smartlockReader nukiapi.SmartlockReader) error {
 			switch update.Message.Command() {
 			case "help":
 				msg.Text = "I understand /battery."
-			case "bat":
-			case "battery":
+			case "bat", "battery":
 				res, err := smartlockReader.Execute()
 				if err != nil {
 					log.Error().Err(err).Msg("Unable to read smartlock status from API")

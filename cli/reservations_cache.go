@@ -12,6 +12,7 @@ var (
 	reservationsCacheTimeout    = time.Hour * 2
 )
 
+// getReservationName returns the name associated to a reservation
 func getReservationName(ref string, config *Config) (string, error) {
 	if ref == "" {
 		return "", nil
