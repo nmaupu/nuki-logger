@@ -10,6 +10,7 @@ import (
 type Sender interface {
 	Send(e *Event) error
 	GetName() string
+	GetTimezone() string
 }
 
 type sender struct {
@@ -20,6 +21,10 @@ type sender struct {
 
 func (s *sender) GetName() string {
 	return s.Name
+}
+
+func (s *sender) GetTimezone() string {
+	return s.Timezone
 }
 
 type Event struct {
