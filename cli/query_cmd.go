@@ -2,14 +2,14 @@ package cli
 
 import (
 	"fmt"
+	"slices"
+	"time"
+
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/model"
-	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"slices"
-	"time"
 )
 
 const (
@@ -67,14 +67,9 @@ func init() {
 }
 
 func QueryRun(_ *cobra.Command, _ []string) error {
-	nukiLogsReader := nukiapi.LogsReader{
-		SmartlockID: config.SmartlockID,
-		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
-		Limit:       viper.GetInt(FlagLimit),
-		FromDate:    viper.GetTime(FromDateTime),
-		ToDate:      viper.GetTime(ToDateTime),
-	}
-	logs, err := nukiLogsReader.Execute()
+	logsReader := config.LogsReader
+	logsReader.Limit = viper.GetInt(FlagLimit)
+	logs, err := logsReader.Execute()
 	if err != nil {
 		return err
 	}
@@ -85,7 +80,7 @@ func QueryRun(_ *cobra.Command, _ []string) error {
 		for _, sender := range senders {
 			var reservationName string
 			if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
-				reservationName, err = reservationReader.GetReservationName(l.Name)
+				reservationName, err = config.ReservationsReader.GetReservationName(l.Name)
 				if err != nil {
 					log.Error().
 						Err(err).

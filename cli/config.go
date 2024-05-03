@@ -2,7 +2,9 @@ package cli
 
 import (
 	"fmt"
+
 	"github.com/nmaupu/nuki-logger/messaging"
+	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/spf13/viper"
 )
 
@@ -15,6 +17,30 @@ type Config struct {
 		Enabled    bool   `mapstructure:"enabled"`
 		SenderName string `mapstructure:"sender_name"`
 	} `mapstructure:"telegram_bot"`
+	LogsReader          nukiapi.LogsReader          `mapstructure:"-"`
+	SmartlockReader     nukiapi.SmartlockReader     `mapstructure:"-"`
+	SmartlockAuthReader nukiapi.SmartlockAuthReader `mapstructure:"-"`
+	ReservationsReader  nukiapi.ReservationsReader  `mapstructure:"-"`
+}
+
+func (c *Config) initReaders() {
+	c.LogsReader = nukiapi.LogsReader{
+		APICaller:   nukiapi.APICaller{Token: c.NukiAPIToken},
+		SmartlockID: c.SmartlockID,
+		Limit:       20,
+	}
+	c.SmartlockReader = nukiapi.SmartlockReader{
+		APICaller:   nukiapi.APICaller{Token: c.NukiAPIToken},
+		SmartlockID: c.SmartlockID,
+	}
+	c.ReservationsReader = nukiapi.ReservationsReader{
+		APICaller: nukiapi.APICaller{Token: c.NukiAPIToken},
+		AddressID: c.AddressID,
+	}
+	c.SmartlockAuthReader = nukiapi.SmartlockAuthReader{
+		APICaller:   nukiapi.APICaller{Token: c.NukiAPIToken},
+		SmartlockID: c.SmartlockID,
+	}
 }
 
 type SenderConfig struct {
@@ -46,10 +72,15 @@ func (c *Config) LoadConfig(vi *viper.Viper) error {
 		return err
 	}
 
-	return vi.Unmarshal(c)
+	if err := vi.Unmarshal(c); err != nil {
+		return err
+	}
+	c.initReaders()
+
+	return nil
 }
 
-func (c Config) GetSender(name string) (messaging.Sender, error) {
+func (c *Config) GetSender(name string) (messaging.Sender, error) {
 	for _, s := range c.Senders {
 		if s.Name == name {
 			return s.GetSender()

@@ -77,7 +77,7 @@ func init() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
-	viper.BindPFlags(RootCmd.PersistentFlags())
+	_ = viper.BindPFlags(RootCmd.PersistentFlags())
 }
 
 func initSenders() error {

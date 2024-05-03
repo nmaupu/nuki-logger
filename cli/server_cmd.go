@@ -10,7 +10,6 @@ import (
 	"github.com/nmaupu/nuki-logger/cache"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/model"
-	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/nmaupu/nuki-logger/telegrambot"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -30,16 +29,12 @@ var (
 		SilenceErrors: true,
 		RunE:          RunServer,
 	}
-
-	logsReader          nukiapi.LogsReader
-	smartlockReader     nukiapi.SmartlockReader
-	reservationReader   nukiapi.ReservationsReader
-	smartlockAuthReader nukiapi.SmartlockAuthReader
 )
 
 func init() {
 	ServerCmd.Flags().DurationP(FlagServerInterval, "i", time.Second*60, "Interval at which to check new logs")
 	_ = viper.BindPFlags(ServerCmd.Flags())
+
 }
 
 func RunServer(_ *cobra.Command, _ []string) error {
@@ -49,25 +44,6 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	interruptSigChan := make(chan os.Signal, 1)
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Init readers
-	logsReader = nukiapi.LogsReader{
-		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
-		SmartlockID: config.SmartlockID,
-		Limit:       20,
-	}
-	smartlockReader = nukiapi.SmartlockReader{
-		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
-		SmartlockID: config.SmartlockID,
-	}
-	reservationReader = nukiapi.ReservationsReader{
-		APICaller: nukiapi.APICaller{Token: config.NukiAPIToken},
-		AddressID: config.AddressID,
-	}
-	smartlockAuthReader = nukiapi.SmartlockAuthReader{
-		APICaller:   nukiapi.APICaller{Token: config.NukiAPIToken},
-		SmartlockID: config.SmartlockID,
-	}
-
 	log.Info().Msg("Reading old log responses from cache")
 	cacheLogs, err := cache.LoadCacheFromDisk()
 	if err != nil {
@@ -76,7 +52,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	if len(cacheLogs) == 0 {
 		// No cache, creating one
 		log.Info().Msg("No cache yet, creating one")
-		cacheLogs, err := logsReader.Execute()
+		cacheLogs, err := config.LogsReader.Execute()
 		if err != nil {
 			return err
 		}
@@ -91,7 +67,11 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			return err
 		}
 		tgSender := tgSenderInterface.(*messaging.TelegramSender)
-		nukiBot := telegrambot.NewNukiBot(tgSender, logsReader, smartlockReader, reservationReader, smartlockAuthReader)
+		nukiBot := telegrambot.NewNukiBot(tgSender,
+			config.LogsReader,
+			config.SmartlockReader,
+			config.ReservationsReader,
+			config.SmartlockAuthReader)
 
 		if err := nukiBot.Start(); err != nil {
 			return err
@@ -105,7 +85,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			select {
 			case <-tickerSmartlock.C:
 				log.Info().Msg("Checking smartlock for issues")
-				resp, err := smartlockReader.Execute()
+				resp, err := config.SmartlockReader.Execute()
 				if err != nil {
 					log.Error().Err(err).Msg("Unable to check smartlock")
 				}
@@ -128,7 +108,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			case <-tickerLogs.C:
 				log.Info().Msg("Getting logs from api")
 
-				newResponses, err := logsReader.Execute()
+				newResponses, err := config.LogsReader.Execute()
 				if err != nil {
 					log.Error().Err(err).Msg("An error occurred getting logs from API")
 				}
@@ -138,7 +118,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 					for _, d := range diff {
 						reservationName := d.Name
 						if d.Trigger == model.NukiTriggerKeypad && d.Source == model.NukiSourceKeypadCode && d.State != model.NukiStateWrongKeypadCode {
-							reservationName, err = reservationReader.GetReservationName(d.Name)
+							reservationName, err = config.ReservationsReader.GetReservationName(d.Name)
 							if err != nil {
 								log.Error().
 									Err(err).
