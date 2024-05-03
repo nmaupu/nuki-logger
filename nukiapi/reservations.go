@@ -3,7 +3,15 @@ package nukiapi
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/nmaupu/nuki-logger/model"
+)
+
+var (
+	reservationsCache           = map[string]string{}
+	reservationsCacheLastUpdate time.Time
+	reservationsCacheTimeout    = time.Hour * 2
 )
 
 type ReservationsReader struct {
@@ -29,4 +37,36 @@ func (r ReservationsReader) Execute() ([]model.NukiReservationResponse, error) {
 	var responses []model.NukiReservationResponse
 	err = json.Unmarshal(body, &responses)
 	return responses, err
+}
+
+// getReservationName returns the name associated to a reservation
+func (r ReservationsReader) GetReservationName(ref string) (string, error) {
+	if ref == "" {
+		return "", nil
+	}
+
+	var ok bool
+	var reservationName string
+	reservationName, ok = reservationsCache[ref]
+	if ok &&
+		!reservationsCacheLastUpdate.IsZero() &&
+		time.Since(reservationsCacheLastUpdate) < reservationsCacheTimeout {
+		return reservationName, nil
+	}
+
+	// getting real person's name from address API
+	reservations, err := r.Execute()
+	if err != nil {
+		return "", err
+	}
+	for _, resa := range reservations {
+		reservationsCache[resa.Reference] = resa.Name
+	}
+	reservationsCacheLastUpdate = time.Now()
+
+	reservationName, ok = reservationsCache[ref]
+	if !ok {
+		return "", fmt.Errorf("unable to find ref '%s'", ref)
+	}
+	return reservationName, nil
 }

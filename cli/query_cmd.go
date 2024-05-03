@@ -63,7 +63,7 @@ func init() {
 	QueryCmd.Flags().String(FlagToDate, "", "Retrieve logs to this date (RFC3339)")
 	QueryCmd.Flags().Bool(FlagJson, false, "Output results in json")
 
-	viper.BindPFlags(QueryCmd.Flags())
+	_ = viper.BindPFlags(QueryCmd.Flags())
 }
 
 func QueryRun(_ *cobra.Command, _ []string) error {
@@ -85,7 +85,7 @@ func QueryRun(_ *cobra.Command, _ []string) error {
 		for _, sender := range senders {
 			var reservationName string
 			if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
-				reservationName, err = getReservationName(l.Name, &config)
+				reservationName, err = reservationReader.GetReservationName(l.Name)
 				if err != nil {
 					log.Error().
 						Err(err).

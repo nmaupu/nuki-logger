@@ -1,8 +1,12 @@
 package cli
 
 import (
-	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+
 	"github.com/nmaupu/nuki-logger/cache"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/model"
@@ -11,13 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
-	"os/signal"
-	"slices"
-	"strings"
-	"sync"
-	"syscall"
-	"time"
 )
 
 const (
@@ -89,7 +86,14 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	}
 
 	if config.TelegramBot.Enabled {
-		if err := runTelegramBot(); err != nil {
+		tgSenderInterface, err := config.GetSender(config.TelegramBot.SenderName)
+		if err != nil {
+			return err
+		}
+		tgSender := tgSenderInterface.(*messaging.TelegramSender)
+		nukiBot := telegrambot.NewNukiBot(tgSender, logsReader, smartlockReader, reservationReader, smartlockAuthReader)
+
+		if err := nukiBot.Start(); err != nil {
 			return err
 		}
 	}
@@ -134,7 +138,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 					for _, d := range diff {
 						reservationName := d.Name
 						if d.Trigger == model.NukiTriggerKeypad && d.Source == model.NukiSourceKeypadCode && d.State != model.NukiStateWrongKeypadCode {
-							reservationName, err = getReservationName(d.Name, &config)
+							reservationName, err = reservationReader.GetReservationName(d.Name)
 							if err != nil {
 								log.Error().
 									Err(err).
@@ -174,134 +178,4 @@ func RunServer(_ *cobra.Command, _ []string) error {
 
 	wg.Wait()
 	return nil
-}
-
-func runTelegramBot() error {
-	tgSenderInterface, err := config.GetSender(config.TelegramBot.SenderName)
-	if err != nil {
-		return err
-	}
-	tgSender := tgSenderInterface.(*messaging.TelegramSender)
-
-	commandNames := []string{
-		"/help",
-		"/battery",
-		"/code",
-		"/logs",
-		"/resa",
-	}
-	commands := telegrambot.Commands{}
-	commands["help"] = telegrambot.Command{
-		Handler: func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-			msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(commandNames, ", "))
-		},
-	}
-
-	fBattery := func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-		res, err := smartlockReader.Execute()
-		if err != nil {
-			msg.Text = fmt.Sprintf("Unable to read smartlock status from API, err=%v", err)
-		} else {
-			msg.Text = res.PrettyFormat()
-		}
-	}
-	commands["battery"] = telegrambot.Command{Handler: fBattery}
-	commands["bat"] = telegrambot.Command{Handler: fBattery}
-	commands["resa"] = telegrambot.Command{
-		Handler: func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-			res, err := reservationReader.Execute()
-			if err != nil {
-				msg.Text = fmt.Sprintf("Unable to get reservations from API, err=%v", err)
-				return
-			}
-
-			now := time.Now()
-			var lines []string
-			for _, r := range res {
-				isBold := now.After(r.StartDate) && now.Before(r.EndDate)
-				loc, err := time.LoadLocation(tgSender.Timezone)
-				if err != nil {
-					loc = time.UTC
-				}
-				startDate := r.StartDate.In(loc).Format("02/01 15:04")
-				endDate := r.EndDate.In(loc).Format("02/01 15:04")
-				line := fmt.Sprintf("%s (%s) - %s -> %s", r.Name, r.Reference, startDate, endDate)
-				if isBold {
-					line = "*" + line + "*"
-				}
-				lines = append(lines, line)
-			}
-			msg.ParseMode = tgbotapi.ModeMarkdown
-			msg.Text = fmt.Sprintf("Reservations:\n%s", strings.Join(lines, "\n"))
-		},
-	}
-	commands["logs"] = telegrambot.Command{
-		Handler: func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-			lr := logsReader
-			lr.Limit = 10
-			res, err := lr.Execute()
-			if err != nil {
-				msg.Text = fmt.Sprintf("Unable to get logs from API, err=%v", err)
-				return
-			}
-			slices.Reverse(res)
-			for _, l := range res {
-				reservationName := l.Name
-				if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
-					reservationName, err = getReservationName(l.Name, &config)
-					if err != nil {
-						log.Error().
-							Err(err).
-							Str("ref", l.Name).
-							Msg("Unable to get reservation's name, keeping original ref as name")
-						reservationName = l.Name
-					}
-				}
-				tgSender.Send(&messaging.Event{
-					Log:             l,
-					ReservationName: reservationName,
-				})
-			}
-		},
-	}
-	commands["code"] = telegrambot.Command{
-		Handler: func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-			res, err := reservationReader.Execute()
-			if err != nil {
-				msg.Text = fmt.Sprintf("Unable to get reservations from API, err=%v", err)
-				return
-			}
-
-			var keyboardButtons []tgbotapi.InlineKeyboardButton
-			for _, r := range res {
-				keyboardButtons = append(keyboardButtons,
-					tgbotapi.NewInlineKeyboardButtonData(
-						fmt.Sprintf("%s (%s)", r.Name, r.Reference),
-						telegrambot.NewCallbackData("code", r.Reference)))
-			}
-
-			msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(keyboardButtons)
-			msg.Text = "Select a reservation"
-		},
-		Callback: func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-			data := telegrambot.GetDataFromCallbackData(update.CallbackQuery)
-			if data == "" {
-				msg.Text = "Unknown data"
-				return
-			}
-			res, err := smartlockAuthReader.Execute()
-			if err != nil {
-				msg.Text = fmt.Sprintf("Unable to get smartlock auth from API, err=%v", err)
-			}
-			for _, v := range res {
-				if v.Name == data {
-					msg.Text = fmt.Sprintf("code: %d", v.Code)
-					return
-				}
-			}
-			msg.Text = fmt.Sprintf("Unable to find code for %s", data)
-		},
-	}
-
-	return commands.Start(tgSender)
 }
