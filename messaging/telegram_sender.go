@@ -49,7 +49,9 @@ func (t *TelegramSender) Send(events []*Event) error {
 		logsLines = append(logsLines, msg)
 	}
 
-	_, err = botAPI.Send(tgbotapi.NewMessage(t.ChatID, strings.Join(logsLines, "\n")))
+	tgMsg := tgbotapi.NewMessage(t.ChatID, strings.Join(logsLines, "\n"))
+	tgMsg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true) // Getting rid of any previous telegram keyboard
+	_, err = botAPI.Send(tgMsg)
 	return err
 }
 
