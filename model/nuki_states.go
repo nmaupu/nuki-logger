@@ -39,22 +39,13 @@ var (
 
 func (n NukiState) GetEmoji() string {
 	switch n {
-	case NukiStateLowMotorVoltage:
-	case NukiStateMotorBlocked:
-	case NukiStateBusy:
-	case NukiStateTooRecent:
+	case NukiStateLowMotorVoltage, NukiStateMotorBlocked, NukiStateBusy, NukiStateTooRecent:
 		return emoji.Warning.String()
-	case NukiStateWrongKeypadCode:
-	case NukiStateRejectedNightMode:
-	case NukiStateRejected:
+	case NukiStateWrongKeypadCode, NukiStateRejectedNightMode, NukiStateRejected:
 		return emoji.RedCircle.String()
-	case NukiStateOtherError:
-	case NukiStateUnknownError:
-	case NukiStateClutchFailure:
-	case NukiStateMotorPowerFailure:
+	case NukiStateOtherError, NukiStateUnknownError, NukiStateClutchFailure, NukiStateMotorPowerFailure:
 		return emoji.ExclamationMark.String()
-	case NukiStateCanceled:
-	case NukiStateIncomplete:
+	case NukiStateCanceled, NukiStateIncomplete:
 		return emoji.HollowRedCircle.String()
 	case NukiStateSuccess:
 		return emoji.GreenCircle.String()
