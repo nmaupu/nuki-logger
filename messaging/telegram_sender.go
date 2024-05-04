@@ -72,10 +72,6 @@ func (t *TelegramSender) processLogEvent(e *Event) (string, error) {
 			date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.Log.State.GetEmoji()), nil
 	case e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceKeypadCode:
 		// Someone enters keypad code
-		name := e.ReservationName
-		if name == "" {
-			name = e.Log.Name
-		}
 		return fmt.Sprintf("%s%s %s by '%s' %s",
 			date, e.Log.Trigger.GetEmoji(), e.Log.Action.String(), e.ReservationName, e.Log.State.GetEmoji()), nil
 	case e.Log.Trigger == model.NukiTriggerKeypad && e.Log.Source == model.NukiSourceDefault:
