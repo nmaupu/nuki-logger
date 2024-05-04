@@ -3,29 +3,31 @@ package telegrambot
 import (
 	"fmt"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/mymmrac/telego"
+	tu "github.com/mymmrac/telego/telegoutil"
 )
 
-func (b *nukiBot) handlerCode(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
+func (b *nukiBot) handlerCode(update telego.Update, msg *telego.SendMessageParams) {
 	res, err := b.reservationsReader.Execute()
 	if err != nil {
 		msg.Text = fmt.Sprintf("Unable to get reservations from API, err=%v", err)
 		return
 	}
 
-	var keyboardButtons []tgbotapi.InlineKeyboardButton
+	var keyboardButtons []telego.InlineKeyboardButton
 	for _, r := range res {
 		keyboardButtons = append(keyboardButtons,
-			tgbotapi.NewInlineKeyboardButtonData(
-				fmt.Sprintf("%s (%s)", r.Name, r.Reference),
-				NewCallbackData("code", r.Reference)))
+			tu.InlineKeyboardButton(fmt.Sprintf("%s (%s)", r.Name, r.Reference)).
+				WithCallbackData(NewCallbackData("code", r.Reference)))
 	}
+	keyboard := tu.InlineKeyboard(keyboardButtons)
 
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(keyboardButtons)
+	msg.ReplyMarkup = keyboard
 	msg.Text = "Select a reservation"
+	msg.ProtectContent = true
 }
 
-func (b *nukiBot) callbackCode(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
+func (b *nukiBot) callbackCode(update telego.Update, msg *telego.SendMessageParams) {
 	data := GetDataFromCallbackData(update.CallbackQuery)
 	if data == "" {
 		msg.Text = "Unknown data"

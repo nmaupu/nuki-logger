@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/mymmrac/telego"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/nukiapi"
 	sf "github.com/sa-/slicefunk"
@@ -40,7 +40,7 @@ func NewNukiBot(sender *messaging.TelegramSender,
 
 func (b *nukiBot) Start() error {
 	commands := Commands{}
-	help := func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
+	help := func(update telego.Update, msg *telego.SendMessageParams) {
 		keys := sf.Map(maps.Keys(commands), func(item string) string { return "/" + item })
 		msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(keys, ", "))
 	}

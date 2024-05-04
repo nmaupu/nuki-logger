@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/enescakir/emoji"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/nmaupu/nuki-logger/model"
+
+	"github.com/mymmrac/telego"
+	tu "github.com/mymmrac/telego/telegoutil"
 )
 
 var (
@@ -23,15 +25,16 @@ type TelegramSender struct {
 
 func (t *TelegramSender) Send(events []*Event) error {
 	var err error
-	var msg string
 
-	botAPI, err := tgbotapi.NewBotAPI(t.Token)
+	bot, err := telego.NewBot(t.Token)
 	if err != nil {
 		return err
 	}
 
 	var logsLines []string
 	for _, e := range events {
+		var msg string
+
 		if e.IsLogEvent() {
 			msg, err = t.FormatLogEvent(e)
 			if err != nil {
@@ -49,9 +52,11 @@ func (t *TelegramSender) Send(events []*Event) error {
 		logsLines = append(logsLines, msg)
 	}
 
-	tgMsg := tgbotapi.NewMessage(t.ChatID, strings.Join(logsLines, "\n"))
-	tgMsg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true) // Getting rid of any previous telegram keyboard
-	_, err = botAPI.Send(tgMsg)
+	tgMsg := tu.Message(
+		tu.ID(t.ChatID),
+		strings.Join(logsLines, "\n"),
+	)
+	_, err = bot.SendMessage(tgMsg)
 	return err
 }
 

@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/enescakir/emoji"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/rs/zerolog/log"
+
+	"github.com/mymmrac/telego"
+	tu "github.com/mymmrac/telego/telegoutil"
 )
 
 var (
@@ -15,20 +18,15 @@ var (
 	menuResa    = fmt.Sprintf("%s %s", emoji.OpenBook.String(), "resa")
 )
 
-func (b *nukiBot) handlerMenu(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-	numericKeyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(menuBattery),
-			tgbotapi.NewKeyboardButton(menuLogs),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(menuCode),
-			tgbotapi.NewKeyboardButton(menuResa),
-		),
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(menuHelp),
-		),
-	)
+func (b *nukiBot) handlerMenu(update telego.Update, msg *telego.SendMessageParams) {
+	log.Debug().Msg("menuHandler called")
+	keyboard := tu.Keyboard(
+		tu.KeyboardRow(tu.KeyboardButton(menuBattery), tu.KeyboardButton(menuLogs)),
+		tu.KeyboardRow(tu.KeyboardButton(menuCode), tu.KeyboardButton(menuResa)),
+		tu.KeyboardRow(tu.KeyboardButton(menuHelp)),
+	).WithResizeKeyboard().WithInputFieldPlaceholder("Menu")
+
 	msg.Text = "Menu"
-	msg.ReplyMarkup = numericKeyboard
+	msg.ReplyMarkup = keyboard
+	msg.ProtectContent = true
 }

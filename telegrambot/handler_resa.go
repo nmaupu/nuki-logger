@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/mymmrac/telego"
 )
 
-func (b *nukiBot) handlerResa(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
+func (b *nukiBot) handlerResa(update telego.Update, msg *telego.SendMessageParams) {
 	res, err := b.reservationsReader.Execute()
 	if err != nil {
 		msg.Text = fmt.Sprintf("Unable to get reservations from API, err=%v", err)
@@ -31,6 +31,5 @@ func (b *nukiBot) handlerResa(update tgbotapi.Update, msg *tgbotapi.MessageConfi
 		}
 		lines = append(lines, line)
 	}
-	msg.ParseMode = tgbotapi.ModeMarkdown
 	msg.Text = fmt.Sprintf("Reservations:\n%s", strings.Join(lines, "\n"))
 }

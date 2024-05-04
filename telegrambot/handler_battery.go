@@ -3,10 +3,10 @@ package telegrambot
 import (
 	"fmt"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/mymmrac/telego"
 )
 
-func (b *nukiBot) handlerBattery(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
+func (b *nukiBot) handlerBattery(update telego.Update, msg *telego.SendMessageParams) {
 	res, err := b.smartlockReader.Execute()
 	if err != nil {
 		msg.Text = fmt.Sprintf("Unable to read smartlock status from API, err=%v", err)

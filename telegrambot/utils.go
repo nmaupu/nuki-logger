@@ -3,21 +3,21 @@ package telegrambot
 import (
 	"strings"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/mymmrac/telego"
 )
 
 const (
 	CallbackCommandSeparator = "|"
 )
 
-func GetCommandFromCallbackData(callbackQuery *tgbotapi.CallbackQuery) string {
+func GetCommandFromCallbackData(callbackQuery *telego.CallbackQuery) string {
 	if callbackQuery == nil {
 		return ""
 	}
 	return strings.Split(callbackQuery.Data, CallbackCommandSeparator)[0]
 }
 
-func GetDataFromCallbackData(callbackQuery *tgbotapi.CallbackQuery) string {
+func GetDataFromCallbackData(callbackQuery *telego.CallbackQuery) string {
 	if callbackQuery == nil {
 		return ""
 	}

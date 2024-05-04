@@ -1,11 +1,15 @@
 package telegrambot
 
 import (
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"strings"
+
+	"github.com/mymmrac/telego"
+	tu "github.com/mymmrac/telego/telegoutil"
+
 	"github.com/rs/zerolog/log"
 )
 
-type CommandHandler func(update tgbotapi.Update, msgResponse *tgbotapi.MessageConfig)
+type CommandHandler func(update telego.Update, msgResponse *telego.SendMessageParams)
 
 type Command struct {
 	Handler  CommandHandler
@@ -14,19 +18,18 @@ type Command struct {
 type Commands map[string]Command
 
 func (c Commands) start(b *nukiBot) error {
-	bot, err := tgbotapi.NewBotAPI(b.sender.Token)
+	bot, err := telego.NewBot(b.sender.Token)
 	if err != nil {
 		return err
 	}
 
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates, err := bot.GetUpdatesChan(u)
+	updates, err := bot.UpdatesViaLongPolling(nil)
 	if err != nil {
 		return err
 	}
 
 	go func() {
+		defer bot.StopLongPolling()
 		for update := range updates {
 			if update.CallbackQuery == nil && update.Message == nil {
 				continue
@@ -36,7 +39,7 @@ func (c Commands) start(b *nukiBot) error {
 			if update.Message != nil && !isPrivateMessage(update) {
 				// Command are only executed through private messages, deleting message.
 				log.Debug().Msg("Ignoring commands sent to group")
-				_, err := bot.DeleteMessage(tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID))
+				err := bot.DeleteMessage(tu.Delete(update.Message.Chat.ChatID(), update.Message.MessageID))
 				if err != nil {
 					log.Error().Err(err).
 						Int64("chat_id", update.Message.Chat.ID).
@@ -49,7 +52,7 @@ func (c Commands) start(b *nukiBot) error {
 			}
 
 			var command string
-			if update.Message != nil && !update.Message.IsCommand() {
+			if update.Message != nil && !strings.HasPrefix(update.Message.Text, "/") {
 				// Menu click
 				switch update.Message.Text {
 				case menuResa:
@@ -64,22 +67,19 @@ func (c Commands) start(b *nukiBot) error {
 					command = "start"
 				}
 			} else if update.Message != nil {
-				command = update.Message.Command()
-			}
-
-			var message *tgbotapi.Message
-			if update.Message != nil {
-				message = update.Message
-			} else {
-				message = update.CallbackQuery.Message
+				command, _ = strings.CutPrefix(update.Message.Text, "/")
 			}
 
 			if destinationChatID == 0 {
-				destinationChatID = message.Chat.ID
+				if update.Message != nil {
+					destinationChatID = update.Message.Chat.ID
+				} else {
+					destinationChatID = update.CallbackQuery.Message.GetChat().ID
+				}
 			}
-			msgToSend := tgbotapi.NewMessage(destinationChatID, "")
-			msgToSend.ReplyToMessageID = 0
-			msgToSend.ParseMode = tgbotapi.ModeMarkdown
+
+			msgToSend := tu.Message(tu.ID(destinationChatID), "")
+			msgToSend.ParseMode = telego.ModeMarkdown
 
 			var fn CommandHandler
 			if update.Message != nil {
@@ -90,18 +90,17 @@ func (c Commands) start(b *nukiBot) error {
 			if fn == nil {
 				msgToSend.Text = "Unknown command."
 			} else {
-				fn(update, &msgToSend)
+				fn(update, msgToSend)
 				if update.CallbackQuery != nil { // fn is a callback func, answering callback ok
-					config := tgbotapi.CallbackConfig{CallbackQueryID: update.CallbackQuery.ID}
-					_, _ = bot.AnswerCallbackQuery(config)
+					_ = bot.AnswerCallbackQuery(tu.CallbackQuery(update.CallbackQuery.ID))
 				}
 			}
-			_, _ = bot.Send(msgToSend)
+			_, _ = bot.SendMessage(msgToSend)
 		}
 	}()
 	return nil
 }
 
-func isPrivateMessage(update tgbotapi.Update) bool {
-	return update.Message != nil && update.Message.Chat != nil && update.Message.Chat.IsPrivate()
+func isPrivateMessage(update telego.Update) bool {
+	return update.Message != nil && update.Message.Chat.Type == telego.ChatTypePrivate
 }
