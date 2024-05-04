@@ -3,10 +3,12 @@ package messaging
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/enescakir/emoji"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/nmaupu/nuki-logger/model"
-	"time"
 )
 
 var (
@@ -19,7 +21,7 @@ type TelegramSender struct {
 	ChatID int64  `mapstructure:"chat_id"`
 }
 
-func (t *TelegramSender) Send(e *Event) error {
+func (t *TelegramSender) Send(events []*Event) error {
 	var err error
 	var msg string
 
@@ -28,25 +30,30 @@ func (t *TelegramSender) Send(e *Event) error {
 		return err
 	}
 
-	if e.IsLogEvent() {
-		msg, err = t.processLogEvent(e)
-		if err != nil {
-			return err
+	var logsLines []string
+	for _, e := range events {
+		if e.IsLogEvent() {
+			msg, err = t.FormatLogEvent(e)
+			if err != nil {
+				return err
+			}
+		} else if e.IsSmartlockEvent() {
+			msg, err = t.formatSmartlockEvent(e)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("unable to determine the type of event to send")
 		}
-	} else if e.IsSmartlockEvent() {
-		msg, err = t.processSmartlockEvent(e)
-		if err != nil {
-			return err
-		}
-	} else {
-		return fmt.Errorf("unable to determine the type of event to send")
+
+		logsLines = append(logsLines, msg)
 	}
 
-	_, err = botAPI.Send(tgbotapi.NewMessage(t.ChatID, msg))
+	_, err = botAPI.Send(tgbotapi.NewMessage(t.ChatID, strings.Join(logsLines, "\n")))
 	return err
 }
 
-func (t *TelegramSender) processLogEvent(e *Event) (string, error) {
+func (t *TelegramSender) FormatLogEvent(e *Event) (string, error) {
 	if e.Json {
 		bytes, err := json.Marshal(e.Log)
 		if err != nil {
@@ -89,7 +96,7 @@ func (t *TelegramSender) processLogEvent(e *Event) (string, error) {
 	}
 }
 
-func (t *TelegramSender) processSmartlockEvent(e *Event) (string, error) {
+func (t *TelegramSender) formatSmartlockEvent(e *Event) (string, error) {
 	if e.Json {
 		bytes, err := json.Marshal(e.Smartlock.ToSmartlockState())
 		if err != nil {

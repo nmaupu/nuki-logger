@@ -94,9 +94,8 @@ func RunServer(_ *cobra.Command, _ []string) error {
 					resp.State.DoorsensorBatteryCritical ||
 					resp.State.BatteryCharge <= 30 {
 					for _, sender := range senders {
-						if err := sender.Send(&messaging.Event{
-							Smartlock: *resp,
-						}); err != nil {
+						e := &messaging.Event{Smartlock: *resp}
+						if err := sender.Send([]*messaging.Event{e}); err != nil {
 							log.Error().
 								Err(err).
 								Str("sender", sender.GetName()).
@@ -114,6 +113,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 				}
 
 				diff := model.Diff(newResponses, cacheLogs)
+				var events []*messaging.Event
 				if len(diff) > 0 {
 					for _, d := range diff {
 						reservationName := d.Name
@@ -128,17 +128,19 @@ func RunServer(_ *cobra.Command, _ []string) error {
 							}
 						}
 
-						// log those new messages
-						for _, sender := range senders {
-							if err := sender.Send(&messaging.Event{
-								Log:             d,
-								ReservationName: reservationName,
-							}); err != nil {
-								log.Error().
-									Err(err).
-									Str("sender", sender.GetName()).
-									Msg("Unable to send message to sender")
-							}
+						events = append(events, &messaging.Event{
+							Log:             d,
+							ReservationName: reservationName,
+						})
+					}
+
+					// log those new messages
+					for _, sender := range senders {
+						if err := sender.Send(events); err != nil {
+							log.Error().
+								Err(err).
+								Str("sender", sender.GetName()).
+								Msg("Unable to send message")
 						}
 					}
 

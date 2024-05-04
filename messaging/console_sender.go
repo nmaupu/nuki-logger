@@ -14,7 +14,20 @@ type ConsoleSender struct {
 	sender `mapstructure:",squash"`
 }
 
-func (c *ConsoleSender) Send(e *Event) error {
+func (c *ConsoleSender) Send(events []*Event) error {
+	for _, e := range events {
+		if e == nil {
+			continue
+		}
+
+		if err := c.sendOne(e); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *ConsoleSender) sendOne(e *Event) error {
 	if e.Json {
 		var bytes []byte
 		var err error

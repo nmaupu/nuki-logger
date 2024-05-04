@@ -8,7 +8,7 @@ import (
 )
 
 type Sender interface {
-	Send(e *Event) error
+	Send(events []*Event) error
 	GetName() string
 	GetTimezone() string
 }

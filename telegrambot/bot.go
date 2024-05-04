@@ -50,7 +50,7 @@ func (b *nukiBot) Start() error {
 	commands["battery"] = Command{Handler: b.handlerBattery}
 	commands["bat"] = Command{Handler: b.handlerBattery}
 	commands["resa"] = Command{Handler: b.handlerResa}
-	commands["logs"] = Command{Handler: b.handlerLogs}
+	commands["logs"] = Command{Handler: b.handlerLogs, Callback: b.callbackLogs}
 	commands["code"] = Command{Handler: b.handlerCode, Callback: b.callbackCode}
 
 	return commands.start(b)

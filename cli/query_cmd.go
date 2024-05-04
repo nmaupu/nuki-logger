@@ -78,30 +78,33 @@ func QueryRun(_ *cobra.Command, _ []string) error {
 
 	slices.Reverse(logs)
 
+	var events []*messaging.Event
 	for _, l := range logs {
-		for _, sender := range senders {
-			var reservationName string
-			if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
-				reservationName, err = config.ReservationsReader.GetReservationName(l.Name)
-				if err != nil {
-					log.Error().
-						Err(err).
-						Str("ref", l.Name).
-						Msg("Unable to get reservation's name, keeping original ref as name")
-					reservationName = l.Name
-				}
-			}
-
-			if err := sender.Send(&messaging.Event{
-				Log:             l,
-				ReservationName: reservationName,
-				Json:            viper.GetBool(FlagJson),
-			}); err != nil {
+		var reservationName string
+		if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
+			reservationName, err = config.ReservationsReader.GetReservationName(l.Name)
+			if err != nil {
 				log.Error().
 					Err(err).
-					Str("sender", sender.GetName()).
-					Msg("Unable to send message to sender")
+					Str("ref", l.Name).
+					Msg("Unable to get reservation's name, keeping original ref as name")
+				reservationName = l.Name
 			}
+		}
+
+		events = append(events, &messaging.Event{
+			Log:             l,
+			ReservationName: reservationName,
+			Json:            viper.GetBool(FlagJson),
+		})
+	}
+
+	for _, sender := range senders {
+		if err := sender.Send(events); err != nil {
+			log.Error().
+				Err(err).
+				Str("sender", sender.GetName()).
+				Msg("Unable to send message")
 		}
 	}
 

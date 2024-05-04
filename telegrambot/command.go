@@ -2,9 +2,10 @@ package telegrambot
 
 import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/rs/zerolog/log"
 )
 
-type CommandHandler func(update tgbotapi.Update, msg *tgbotapi.MessageConfig)
+type CommandHandler func(update tgbotapi.Update, msgResponse *tgbotapi.MessageConfig)
 
 type Command struct {
 	Handler  CommandHandler
@@ -27,9 +28,13 @@ func (c Commands) start(b *nukiBot) error {
 
 	go func() {
 		for update := range updates {
-			var handler CommandHandler
-
 			if update.CallbackQuery == nil && update.Message == nil {
+				continue
+			}
+
+			if update.Message != nil && !isPrivateMessage(update) {
+				// Command are only executed through private messages, skipping.
+				log.Debug().Msg("Ignoring commands sent to group")
 				continue
 			}
 
@@ -59,25 +64,30 @@ func (c Commands) start(b *nukiBot) error {
 				message = update.CallbackQuery.Message
 			}
 
-			msg := tgbotapi.NewMessage(message.Chat.ID, "")
-			msg.ReplyToMessageID = 0
+			msgToSend := tgbotapi.NewMessage(message.Chat.ID, "")
+			msgToSend.ReplyToMessageID = 0
 
+			var fn CommandHandler
 			if update.Message != nil {
-				handler = c[command].Handler
+				fn = c[command].Handler
 			} else {
-				handler = c[GetCommandFromCallbackData(update.CallbackQuery)].Callback
+				fn = c[GetCommandFromCallbackData(update.CallbackQuery)].Callback
 			}
-			if handler == nil {
-				msg.Text = "Unknown command."
+			if fn == nil {
+				msgToSend.Text = "Unknown command."
 			} else {
-				handler(update, &msg)
-				if update.CallbackQuery != nil {
+				fn(update, &msgToSend)
+				if update.CallbackQuery != nil { // fn is a callback func, answering callback ok
 					config := tgbotapi.CallbackConfig{CallbackQueryID: update.CallbackQuery.ID}
 					_, _ = bot.AnswerCallbackQuery(config)
 				}
 			}
-			_, _ = bot.Send(msg)
+			_, _ = bot.Send(msgToSend)
 		}
 	}()
 	return nil
+}
+
+func isPrivateMessage(update tgbotapi.Update) bool {
+	return update.Message != nil && update.Message.Chat != nil && update.Message.Chat.IsPrivate()
 }
