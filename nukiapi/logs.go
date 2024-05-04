@@ -31,10 +31,10 @@ func (r LogsReader) Execute() ([]model.NukiSmartlockLogResponse, error) {
 	}
 	getParams := []string{fmt.Sprintf("limit=%d", r.Limit)}
 	if !r.FromDate.IsZero() {
-		getParams = append(getParams, fmt.Sprintf("fromDate=%s", r.FromDate.Format(time.RFC3339)))
+		getParams = append(getParams, fmt.Sprintf("fromDate=%s", r.FromDate.In(time.UTC).Format(time.RFC3339)))
 	}
 	if !r.ToDate.IsZero() {
-		getParams = append(getParams, fmt.Sprintf("toDate=%s", r.ToDate.Format(time.RFC3339)))
+		getParams = append(getParams, fmt.Sprintf("toDate=%s", r.ToDate.In(time.UTC).Format(time.RFC3339)))
 	}
 
 	requestURL := fmt.Sprintf("%s/%s?%s",

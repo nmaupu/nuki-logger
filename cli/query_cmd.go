@@ -69,6 +69,8 @@ func init() {
 func QueryRun(_ *cobra.Command, _ []string) error {
 	logsReader := config.LogsReader
 	logsReader.Limit = viper.GetInt(FlagLimit)
+	logsReader.FromDate = viper.GetTime(FromDateTime)
+	logsReader.ToDate = viper.GetTime(ToDateTime)
 	logs, err := logsReader.Execute()
 	if err != nil {
 		return err
