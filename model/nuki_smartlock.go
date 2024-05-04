@@ -131,7 +131,7 @@ func (s SmartlockResponse) PrettyFormat() string {
 		eBatteryDoorsensor = crit
 	}
 
-	return fmt.Sprintf("Smartlock %s\nBattery pack: %s (%d%%)\nKeypad: %s\nDoor sensor: %s",
+	return fmt.Sprintf("*Smartlock %s*\nBattery pack: %s (%d%%)\nKeypad: %s\nDoor sensor: %s",
 		smartlockState.Name,
 		eBattery, smartlockState.BatteryCharge,
 		eBatteryKeypad,

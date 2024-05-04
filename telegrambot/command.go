@@ -32,10 +32,20 @@ func (c Commands) start(b *nukiBot) error {
 				continue
 			}
 
+			var destinationChatID int64
 			if update.Message != nil && !isPrivateMessage(update) {
-				// Command are only executed through private messages, skipping.
+				// Command are only executed through private messages, deleting message.
 				log.Debug().Msg("Ignoring commands sent to group")
-				continue
+				_, err := bot.DeleteMessage(tgbotapi.NewDeleteMessage(update.Message.Chat.ID, update.Message.MessageID))
+				if err != nil {
+					log.Error().Err(err).
+						Int64("chat_id", update.Message.Chat.ID).
+						Int("message_id", update.Message.MessageID).
+						Str("message", update.Message.Text).
+						Msg("Unable to delete unwanted message")
+				}
+				// if it's a command: answer response to the member
+				destinationChatID = int64(update.Message.From.ID)
 			}
 
 			var command string
@@ -51,7 +61,7 @@ func (c Commands) start(b *nukiBot) error {
 				case menuBattery:
 					command = "battery"
 				default:
-					command = "help"
+					command = "start"
 				}
 			} else if update.Message != nil {
 				command = update.Message.Command()
@@ -64,8 +74,12 @@ func (c Commands) start(b *nukiBot) error {
 				message = update.CallbackQuery.Message
 			}
 
-			msgToSend := tgbotapi.NewMessage(message.Chat.ID, "")
+			if destinationChatID == 0 {
+				destinationChatID = message.Chat.ID
+			}
+			msgToSend := tgbotapi.NewMessage(destinationChatID, "")
 			msgToSend.ReplyToMessageID = 0
+			msgToSend.ParseMode = tgbotapi.ModeMarkdown
 
 			var fn CommandHandler
 			if update.Message != nil {

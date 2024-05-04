@@ -40,12 +40,13 @@ func NewNukiBot(sender *messaging.TelegramSender,
 
 func (b *nukiBot) Start() error {
 	commands := Commands{}
-	commands["help"] = Command{
-		Handler: func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
-			keys := sf.Map(maps.Keys(commands), func(item string) string { return "/" + item })
-			msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(keys, ", "))
-		},
+	help := func(update tgbotapi.Update, msg *tgbotapi.MessageConfig) {
+		keys := sf.Map(maps.Keys(commands), func(item string) string { return "/" + item })
+		msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(keys, ", "))
 	}
+	commands["start"] = Command{Handler: help}
+	commands["help"] = Command{Handler: help}
+
 	commands["menu"] = Command{Handler: b.handlerMenu}
 	commands["battery"] = Command{Handler: b.handlerBattery}
 	commands["bat"] = Command{Handler: b.handlerBattery}
