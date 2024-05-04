@@ -17,16 +17,39 @@ func (c Commands) start(b *nukiBot) error {
 	if err != nil {
 		return err
 	}
+
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates, err := bot.GetUpdatesChan(u)
 	if err != nil {
 		return err
 	}
+
 	go func() {
 		for update := range updates {
-			if update.CallbackQuery == nil && (update.Message == nil || !update.Message.IsCommand()) {
+			var handler CommandHandler
+
+			if update.CallbackQuery == nil && update.Message == nil {
 				continue
+			}
+
+			var command string
+			if update.Message != nil && !update.Message.IsCommand() {
+				// Menu click
+				switch update.Message.Text {
+				case menuResa:
+					command = "resa"
+				case menuCode:
+					command = "code"
+				case menuLogs:
+					command = "logs"
+				case menuBattery:
+					command = "battery"
+				default:
+					command = "help"
+				}
+			} else if update.Message != nil {
+				command = update.Message.Command()
 			}
 
 			var message *tgbotapi.Message
@@ -37,11 +60,10 @@ func (c Commands) start(b *nukiBot) error {
 			}
 
 			msg := tgbotapi.NewMessage(message.Chat.ID, "")
-			msg.ReplyToMessageID = message.MessageID
+			msg.ReplyToMessageID = 0
 
-			var handler CommandHandler
 			if update.Message != nil {
-				handler = c[message.Command()].Handler
+				handler = c[command].Handler
 			} else {
 				handler = c[GetCommandFromCallbackData(update.CallbackQuery)].Callback
 			}
@@ -51,10 +73,10 @@ func (c Commands) start(b *nukiBot) error {
 				handler(update, &msg)
 				if update.CallbackQuery != nil {
 					config := tgbotapi.CallbackConfig{CallbackQueryID: update.CallbackQuery.ID}
-					bot.AnswerCallbackQuery(config)
+					_, _ = bot.AnswerCallbackQuery(config)
 				}
 			}
-			bot.Send(msg)
+			_, _ = bot.Send(msg)
 		}
 	}()
 	return nil
