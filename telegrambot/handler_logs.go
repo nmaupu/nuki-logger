@@ -44,7 +44,7 @@ func (b *nukiBot) callbackLogs(update telego.Update, msg *telego.SendMessagePara
 		return
 	}
 
-	lr := b.logsReader
+	lr := b.LogsReader
 	lr.Limit = limit
 	res, err := lr.Execute()
 	if err != nil {
@@ -61,7 +61,7 @@ func (b *nukiBot) callbackLogs(update telego.Update, msg *telego.SendMessagePara
 			Logger()
 		reservationName := l.Name
 		if l.Trigger == model.NukiTriggerKeypad && l.Source == model.NukiSourceKeypadCode && l.State != model.NukiStateWrongKeypadCode {
-			reservationName, err = b.reservationsReader.GetReservationName(l.Name)
+			reservationName, err = b.ReservationsReader.GetReservationName(l.Name)
 			if err != nil {
 				logger.Error().
 					Err(err).
@@ -69,7 +69,7 @@ func (b *nukiBot) callbackLogs(update telego.Update, msg *telego.SendMessagePara
 				reservationName = l.Name
 			}
 		}
-		str, err := b.sender.FormatLogEvent(&messaging.Event{
+		str, err := b.Sender.FormatLogEvent(&messaging.Event{
 			Log:             l,
 			ReservationName: reservationName,
 		})

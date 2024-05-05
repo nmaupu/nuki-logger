@@ -16,11 +16,11 @@ type NukiBot interface {
 }
 
 type nukiBot struct {
-	sender              *messaging.TelegramSender
-	logsReader          nukiapi.LogsReader
-	smartlockReader     nukiapi.SmartlockReader
-	reservationsReader  nukiapi.ReservationsReader
-	smartlockAuthReader nukiapi.SmartlockAuthReader
+	Sender              *messaging.TelegramSender
+	LogsReader          nukiapi.LogsReader
+	SmartlockReader     nukiapi.SmartlockReader
+	ReservationsReader  nukiapi.ReservationsReader
+	SmartlockAuthReader nukiapi.SmartlockAuthReader
 }
 
 func NewNukiBot(sender *messaging.TelegramSender,
@@ -30,11 +30,11 @@ func NewNukiBot(sender *messaging.TelegramSender,
 	smartlockAuthReader nukiapi.SmartlockAuthReader) NukiBot {
 
 	return &nukiBot{
-		sender:              sender,
-		logsReader:          logsReader,
-		smartlockReader:     smartlockReader,
-		reservationsReader:  reservationsReader,
-		smartlockAuthReader: smartlockAuthReader,
+		Sender:              sender,
+		LogsReader:          logsReader,
+		SmartlockReader:     smartlockReader,
+		ReservationsReader:  reservationsReader,
+		SmartlockAuthReader: smartlockAuthReader,
 	}
 }
 
@@ -52,7 +52,12 @@ func (b *nukiBot) Start() error {
 	commands["bat"] = Command{Handler: b.handlerBattery}
 	commands["resa"] = Command{Handler: b.handlerResa}
 	commands["logs"] = Command{Handler: b.handlerLogs, Callback: b.callbackLogs}
-	commands["code"] = Command{Handler: b.handlerCode, Callback: b.callbackCode}
+
+	codeFSM := b.fsmCodeConversation()
+	commands["/code"] = Command{FSM: codeFSM}
+	commands[menuCode] = Command{FSM: codeFSM}
+
+	commands["modify"] = Command{Handler: b.handlerModify}
 
 	return commands.start(b)
 }

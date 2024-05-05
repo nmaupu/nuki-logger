@@ -9,7 +9,7 @@ import (
 )
 
 func (b *nukiBot) handlerResa(update telego.Update, msg *telego.SendMessageParams) {
-	res, err := b.reservationsReader.Execute()
+	res, err := b.ReservationsReader.Execute()
 	if err != nil {
 		msg.Text = fmt.Sprintf("Unable to get reservations from API, err=%v", err)
 		return
@@ -19,7 +19,7 @@ func (b *nukiBot) handlerResa(update telego.Update, msg *telego.SendMessageParam
 	var lines []string
 	for _, r := range res {
 		isBold := now.After(r.StartDate) && now.Before(r.EndDate)
-		loc, err := time.LoadLocation(b.sender.Timezone)
+		loc, err := time.LoadLocation(b.Sender.Timezone)
 		if err != nil {
 			loc = time.UTC
 		}

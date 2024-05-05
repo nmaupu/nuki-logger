@@ -1,24 +1,31 @@
 package telegrambot
 
 import (
-	"strings"
+	"context"
+	"fmt"
 
+	"github.com/looplab/fsm"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	stateMachines = map[int64]*fsm.FSM{}
+)
+
 type CommandHandler func(update telego.Update, msgResponse *telego.SendMessageParams)
 
 type Command struct {
+	FSM      *fsm.FSM
 	Handler  CommandHandler
 	Callback CommandHandler
 }
 type Commands map[string]Command
 
 func (c Commands) start(b *nukiBot) error {
-	bot, err := telego.NewBot(b.sender.Token)
+	bot, err := telego.NewBot(b.Sender.Token)
 	if err != nil {
 		return err
 	}
@@ -30,6 +37,8 @@ func (c Commands) start(b *nukiBot) error {
 
 	go func() {
 		defer bot.StopLongPolling()
+
+	POLLING:
 		for update := range updates {
 			if update.CallbackQuery == nil && update.Message == nil {
 				continue
@@ -51,25 +60,6 @@ func (c Commands) start(b *nukiBot) error {
 				destinationChatID = int64(update.Message.From.ID)
 			}
 
-			var command string
-			if update.Message != nil && !strings.HasPrefix(update.Message.Text, "/") {
-				// Menu click
-				switch update.Message.Text {
-				case menuResa:
-					command = "resa"
-				case menuCode:
-					command = "code"
-				case menuLogs:
-					command = "logs"
-				case menuBattery:
-					command = "battery"
-				default:
-					command = "start"
-				}
-			} else if update.Message != nil {
-				command, _ = strings.CutPrefix(update.Message.Text, "/")
-			}
-
 			if destinationChatID == 0 {
 				if update.Message != nil {
 					destinationChatID = update.Message.Chat.ID
@@ -78,29 +68,76 @@ func (c Commands) start(b *nukiBot) error {
 				}
 			}
 
+			// Init an empty message to be sent
 			msgToSend := tu.Message(tu.ID(destinationChatID), "")
-			msgToSend.ParseMode = telego.ModeMarkdown
 
-			var fn CommandHandler
-			if update.Message != nil {
-				fn = c[command].Handler
-			} else {
-				fn = c[GetCommandFromCallbackData(update.CallbackQuery)].Callback
-			}
-			if fn == nil {
-				msgToSend.Text = "Unknown command."
-			} else {
-				fn(update, msgToSend)
-				if update.CallbackQuery != nil { // fn is a callback func, answering callback ok
-					_ = bot.AnswerCallbackQuery(tu.CallbackQuery(update.CallbackQuery.ID))
+			var stateM *fsm.FSM
+			if update.Message != nil { // direct message from user
+				command, ok := c[update.Message.Text]
+				if !ok {
+					msgToSend.Text = "Unknown command."
+					sendMessage(bot, msgToSend)
+					continue POLLING
 				}
+				stateM = command.FSM
+				stateM.SetMetadata("msg", msgToSend)
+				stateMachines[destinationChatID] = stateM
+
+				log.Debug().
+					Str("msg", update.Message.Text).
+					Str("fsm_state", stateM.Current()).
+					Msgf("Telegram message received.")
+
+				if err := stateM.Event(context.Background(), "run"); err != nil {
+					msgToSend.Text = fmt.Sprintf("An error occurred, err=%v", err)
+					sendMessage(bot, msgToSend)
+					continue POLLING
+				}
+				sendMessage(bot, msgToSend)
+			} else { // Telegram button's callback
+				// Should already have a FSM registered
+				var ok bool
+				stateM, ok = stateMachines[destinationChatID]
+				if !ok {
+					msgToSend.Text = "Button is expired, use menu."
+					sendMessage(bot, msgToSend)
+					continue POLLING
+				}
+				stateM.SetMetadata("msg", msgToSend)
+
+				log.Debug().
+					Str("msg", update.CallbackQuery.Data).
+					Str("fsm_state", stateM.Current()).
+					Msg("Received callback")
+				if err := bot.AnswerCallbackQuery(tu.CallbackQuery(update.CallbackQuery.ID)); err != nil {
+					log.Error().Err(err).Msg("Unable to answer callback.")
+				}
+				if err := stateM.Event(context.Background(),
+					GetCommandFromCallbackData(update.CallbackQuery),
+					GetDataFromCallbackData(update.CallbackQuery)); err != nil {
+					msgToSend.Text = fmt.Sprintf("An error occurred, err=%v", err)
+				}
+				sendMessage(bot, msgToSend)
 			}
-			_, _ = bot.SendMessage(msgToSend)
 		}
 	}()
+
 	return nil
 }
 
 func isPrivateMessage(update telego.Update) bool {
 	return update.Message != nil && update.Message.Chat.Type == telego.ChatTypePrivate
+}
+
+func sendMessage(bot *telego.Bot, msg *telego.SendMessageParams) {
+	if bot == nil || msg == nil {
+		log.Error().Msg("Cannot send a null message to telegram")
+	}
+
+	_, err := bot.SendMessage(msg)
+	if err != nil {
+		log.Error().Err(err).
+			Str("msg", msg.Text).
+			Msg("An error occurred while sending message")
+	}
 }

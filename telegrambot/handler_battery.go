@@ -7,7 +7,7 @@ import (
 )
 
 func (b *nukiBot) handlerBattery(update telego.Update, msg *telego.SendMessageParams) {
-	res, err := b.smartlockReader.Execute()
+	res, err := b.SmartlockReader.Execute()
 	if err != nil {
 		msg.Text = fmt.Sprintf("Unable to read smartlock status from API, err=%v", err)
 	} else {
