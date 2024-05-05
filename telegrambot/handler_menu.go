@@ -15,14 +15,15 @@ var (
 	menuCode    = fmt.Sprintf("%s %s", emoji.InputNumbers.String(), "code")
 	menuHelp    = fmt.Sprintf("%s %s", emoji.QuestionMark.String(), "help")
 	menuLogs    = fmt.Sprintf("%s %s", emoji.FileFolder.String(), "logs")
-	menuResa    = fmt.Sprintf("%s %s", emoji.OpenBook.String(), "resa")
+	menuResas   = fmt.Sprintf("%s %s", emoji.OpenBook.String(), "resas")
+	menuModify  = fmt.Sprintf("%s %s", emoji.Gear.String(), "modify")
 )
 
 func (b *nukiBot) handlerMenu(update telego.Update, msg *telego.SendMessageParams) {
 	log.Debug().Msg("menuHandler called")
 	keyboard := tu.Keyboard(
-		tu.KeyboardRow(tu.KeyboardButton(menuBattery), tu.KeyboardButton(menuLogs)),
-		tu.KeyboardRow(tu.KeyboardButton(menuCode), tu.KeyboardButton(menuResa)),
+		tu.KeyboardRow(tu.KeyboardButton(menuBattery), tu.KeyboardButton(menuLogs), tu.KeyboardButton(menuCode)),
+		tu.KeyboardRow(tu.KeyboardButton(menuResas), tu.KeyboardButton(menuModify)),
 		tu.KeyboardRow(tu.KeyboardButton(menuHelp)),
 	).WithResizeKeyboard().WithInputFieldPlaceholder("Menu")
 
