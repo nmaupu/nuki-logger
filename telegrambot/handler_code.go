@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (bot nukiBot) fsmCodeConversation() *fsm.FSM {
+func (bot nukiBot) fsmCodeCommand() *fsm.FSM {
 	return fsm.NewFSM(
 		"idle",
 		fsm.Events{
@@ -20,13 +20,9 @@ func (bot nukiBot) fsmCodeConversation() *fsm.FSM {
 		},
 		fsm.Callbacks{
 			"run": func(ctx context.Context, e *fsm.Event) {
-				log.Debug().Str("callback", "ask_resa").Msg("Callback called")
-				msgI, ok := e.FSM.Metadata("msg")
-				if !ok {
-					log.Error().Msg("Unable to get msg from metadata")
-					return
-				}
-				msg := msgI.(*telego.SendMessageParams)
+				log.Debug().Str("callback", "run").Msg("Callback called")
+				msg := &telego.SendMessageParams{}
+				e.FSM.SetMetadata(FSMMetadataMessage, msg)
 
 				res, err := bot.ReservationsReader.Execute()
 				if err != nil {
@@ -47,12 +43,8 @@ func (bot nukiBot) fsmCodeConversation() *fsm.FSM {
 			},
 			"before_resa_received": func(ctx context.Context, e *fsm.Event) {
 				log.Debug().Str("callback", "resa_received").Msg("Callback called")
-				msgI, ok := e.FSM.Metadata("msg")
-				if !ok {
-					log.Error().Msg("Unable to get msg from metadata")
-					return
-				}
-				msg := msgI.(*telego.SendMessageParams)
+				msg := &telego.SendMessageParams{}
+				e.FSM.SetMetadata(FSMMetadataMessage, msg)
 
 				if len(e.Args) != 1 {
 					msg.Text = "Invalid data."

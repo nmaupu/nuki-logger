@@ -47,15 +47,18 @@ func (b *nukiBot) Start() error {
 	commands["start"] = Command{Handler: help}
 	commands["help"] = Command{Handler: help}
 
-	commands["menu"] = Command{Handler: b.handlerMenu}
 	commands["battery"] = Command{Handler: b.handlerBattery}
 	commands["bat"] = Command{Handler: b.handlerBattery}
 	commands["resa"] = Command{Handler: b.handlerResa}
 	commands["logs"] = Command{Handler: b.handlerLogs, Callback: b.callbackLogs}
 
-	codeFSM := b.fsmCodeConversation()
+	commands["/menu"] = Command{Handler: b.handlerMenu}
+
+	codeFSM := b.fsmCodeCommand()
 	commands["/code"] = Command{FSM: codeFSM}
 	commands[menuCode] = Command{FSM: codeFSM}
+
+	commands["/name"] = Command{FSM: b.fsmNameCommand()}
 
 	commands["modify"] = Command{Handler: b.handlerModify}
 

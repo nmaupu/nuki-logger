@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/enescakir/emoji"
 	"github.com/looplab/fsm"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
@@ -11,16 +12,22 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	FSMMetadataCommand = "command"
+	FSMMetadataMessage = "msg"
+)
+
 var (
-	stateMachines = map[int64]*fsm.FSM{}
+	chatSessions = map[int64]*Command{}
 )
 
 type CommandHandler func(update telego.Update, msgResponse *telego.SendMessageParams)
 
 type Command struct {
-	FSM      *fsm.FSM
-	Handler  CommandHandler
-	Callback CommandHandler
+	FSM          *fsm.FSM
+	NextFSMEvent string
+	Handler      CommandHandler
+	Callback     CommandHandler
 }
 type Commands map[string]Command
 
@@ -38,7 +45,6 @@ func (c Commands) start(b *nukiBot) error {
 	go func() {
 		defer bot.StopLongPolling()
 
-	POLLING:
 		for update := range updates {
 			if update.CallbackQuery == nil && update.Message == nil {
 				continue
@@ -68,56 +74,31 @@ func (c Commands) start(b *nukiBot) error {
 				}
 			}
 
-			// Init an empty message to be sent
-			msgToSend := tu.Message(tu.ID(destinationChatID), "")
+			var msg *telego.SendMessageParams
 
-			var stateM *fsm.FSM
-			if update.Message != nil { // direct message from user
-				command, ok := c[update.Message.Text]
-				if !ok {
-					msgToSend.Text = "Unknown command."
-					sendMessage(bot, msgToSend)
-					continue POLLING
-				}
-				stateM = command.FSM
-				stateM.SetMetadata("msg", msgToSend)
-				stateMachines[destinationChatID] = stateM
-
-				log.Debug().
-					Str("msg", update.Message.Text).
-					Str("fsm_state", stateM.Current()).
-					Msgf("Telegram message received.")
-
-				if err := stateM.Event(context.Background(), "run"); err != nil {
-					msgToSend.Text = fmt.Sprintf("An error occurred, err=%v", err)
-					sendMessage(bot, msgToSend)
-					continue POLLING
-				}
-				sendMessage(bot, msgToSend)
-			} else { // Telegram button's callback
-				// Should already have a FSM registered
-				var ok bool
-				stateM, ok = stateMachines[destinationChatID]
-				if !ok {
-					msgToSend.Text = "Button is expired, use menu."
-					sendMessage(bot, msgToSend)
-					continue POLLING
-				}
-				stateM.SetMetadata("msg", msgToSend)
-
-				log.Debug().
-					Str("msg", update.CallbackQuery.Data).
-					Str("fsm_state", stateM.Current()).
-					Msg("Received callback")
+			if isCallback(update) { // Callback keyboard's button
 				if err := bot.AnswerCallbackQuery(tu.CallbackQuery(update.CallbackQuery.ID)); err != nil {
 					log.Error().Err(err).Msg("Unable to answer callback.")
 				}
-				if err := stateM.Event(context.Background(),
-					GetCommandFromCallbackData(update.CallbackQuery),
-					GetDataFromCallbackData(update.CallbackQuery)); err != nil {
-					msgToSend.Text = fmt.Sprintf("An error occurred, err=%v", err)
+
+				msg, err = c.handleCallback(update, destinationChatID)
+				if err != nil {
+					msg = &telego.SendMessageParams{Text: err.Error()}
 				}
-				sendMessage(bot, msgToSend)
+			} else { // Direct message
+				msg, err = c.handleMessage(update, destinationChatID)
+				if err != nil {
+					msg = &telego.SendMessageParams{Text: err.Error()}
+				}
+			}
+
+			// Sending message to client
+			msg.ChatID = tu.ID(destinationChatID)
+			_, err := bot.SendMessage(msg)
+			if err != nil {
+				log.Error().Err(err).
+					Str("msg", msg.Text).
+					Msg("An error occurred while sending message")
 			}
 		}
 	}()
@@ -129,15 +110,82 @@ func isPrivateMessage(update telego.Update) bool {
 	return update.Message != nil && update.Message.Chat.Type == telego.ChatTypePrivate
 }
 
-func sendMessage(bot *telego.Bot, msg *telego.SendMessageParams) {
-	if bot == nil || msg == nil {
-		log.Error().Msg("Cannot send a null message to telegram")
+func isCallback(update telego.Update) bool {
+	return update.Message == nil && update.CallbackQuery != nil
+}
+
+func (c Commands) handleCallback(update telego.Update, destinationChatID int64) (*telego.SendMessageParams, error) {
+	// Should already have a FSM registered
+	command, ok := chatSessions[destinationChatID]
+	if !ok {
+		return nil, fmt.Errorf("This button is expired, use menu or initiate a new command!")
+	}
+	stateM := command.FSM
+
+	log.Debug().
+		Str("msg", update.CallbackQuery.Data).
+		Str("fsm_state", stateM.Current()).
+		Msg("Received callback")
+
+	cmd := GetCommandFromCallbackData(update.CallbackQuery)
+	data := GetDataFromCallbackData(update.CallbackQuery)
+	err := stateM.Event(context.Background(), cmd, data)
+	if err != nil {
+		return nil, err
+	}
+	msg, ok := stateM.Metadata(FSMMetadataMessage)
+	if !ok {
+		return nil, fmt.Errorf("unable to retrieve message from metadata")
+	}
+	return msg.(*telego.SendMessageParams), nil
+}
+
+func (c Commands) handleMessage(update telego.Update, destinationChatID int64) (*telego.SendMessageParams, error) {
+	fsmEvent := "run"
+
+	var command *Command
+
+	cmdFromMsg, ok := c[update.Message.Text]
+	log.Debug().Str("func", "handleMessage").Msgf("cmd = %p", &command)
+	if !ok {
+		// Check if it's part of a conversation
+		sessionCmd, ok := chatSessions[destinationChatID]
+		if !ok || (sessionCmd != nil && sessionCmd.NextFSMEvent == "") {
+			return nil, fmt.Errorf("I don't understand %s", emoji.ManShrugging.String())
+		}
+
+		fsmEvent = sessionCmd.NextFSMEvent
+		command = sessionCmd
+	} else {
+		command = &cmdFromMsg
 	}
 
-	_, err := bot.SendMessage(msg)
-	if err != nil {
-		log.Error().Err(err).
-			Str("msg", msg.Text).
-			Msg("An error occurred while sending message")
+	// If we have a basic handler, execute that instead
+	if command.Handler != nil {
+		msg := &telego.SendMessageParams{}
+		command.Handler(update, msg)
+		return msg, nil
 	}
+
+	if command.FSM == nil {
+		return nil, fmt.Errorf("internal error, fsm is nil")
+	}
+
+	chatSessions[destinationChatID] = command
+
+	log.Debug().
+		Str("msg", update.Message.Text).
+		Str("fsm_state", command.FSM.Current()).
+		Msgf("Telegram message received.")
+
+	command.FSM.SetMetadata(FSMMetadataCommand, command)
+	err := command.FSM.Event(context.Background(), fsmEvent, update.Message.Text)
+	if err != nil {
+		return nil, err
+	}
+	msg, ok := command.FSM.Metadata(FSMMetadataMessage)
+	if !ok {
+		return nil, fmt.Errorf("unable to retrieve message from metadata")
+	}
+	return msg.(*telego.SendMessageParams), nil
 }
