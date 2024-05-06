@@ -31,5 +31,6 @@ func (b *nukiBot) handlerResa(update telego.Update, msg *telego.SendMessageParam
 		}
 		lines = append(lines, line)
 	}
+	msg.ParseMode = telego.ModeMarkdown
 	msg.Text = fmt.Sprintf("Reservations:\n%s", strings.Join(lines, "\n"))
 }

@@ -2,12 +2,12 @@ package telegrambot
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/mymmrac/telego"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/nukiapi"
-	sf "github.com/sa-/slicefunk"
 	"golang.org/x/exp/maps"
 )
 
@@ -41,26 +41,35 @@ func NewNukiBot(sender *messaging.TelegramSender,
 func (b *nukiBot) Start() error {
 	commands := Commands{}
 	help := func(update telego.Update, msg *telego.SendMessageParams) {
-		keys := sf.Map(maps.Keys(commands), func(item string) string { return "/" + item })
-		msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(keys, ", "))
+		keys := maps.Keys(commands)
+		helpItems := slices.DeleteFunc(keys, func(s string) bool { return !strings.HasPrefix(s, "/") })
+		msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(helpItems, ", "))
 	}
-	commands["start"] = Command{Handler: help}
-	commands["help"] = Command{Handler: help}
+	commands["/start"] = Command{Handler: help}
+	commands["/help"] = Command{Handler: help}
+	commands[menuHelp] = Command{Handler: help}
 
-	commands["battery"] = Command{Handler: b.handlerBattery}
-	commands["bat"] = Command{Handler: b.handlerBattery}
-	commands["resa"] = Command{Handler: b.handlerResa}
-	commands["logs"] = Command{Handler: b.handlerLogs, Callback: b.callbackLogs}
+	commands["/battery"] = Command{Handler: b.handlerBattery}
+	commands["/bat"] = Command{Handler: b.handlerBattery}
+	commands[menuBattery] = Command{Handler: b.handlerBattery}
+
+	commands["/resa"] = Command{Handler: b.handlerResa}
+	commands[menuResa] = Command{Handler: b.handlerResa}
+
+	logsFSM := b.fsmLogsCommand()
+	commands["/logs"] = Command{StateMachine: FSM{logsFSM}}
+	commands[menuLogs] = Command{StateMachine: FSM{logsFSM}}
 
 	commands["/menu"] = Command{Handler: b.handlerMenu}
 
 	codeFSM := b.fsmCodeCommand()
-	commands["/code"] = Command{FSM: codeFSM}
-	commands[menuCode] = Command{FSM: codeFSM}
+	commands["/code"] = Command{StateMachine: FSM{codeFSM}}
+	commands[menuCode] = Command{StateMachine: FSM{codeFSM}}
 
-	commands["/name"] = Command{FSM: b.fsmNameCommand()}
+	commands["/name"] = Command{StateMachine: FSM{b.fsmNameCommand()}}
 
-	commands["modify"] = Command{Handler: b.handlerModify}
+	commands["/modify"] = Command{Handler: b.handlerModify}
+	commands[menuModify] = Command{Handler: b.handlerModify}
 
 	return commands.start(b)
 }

@@ -14,12 +14,12 @@ func (bot nukiBot) fsmCodeCommand() *fsm.FSM {
 	return fsm.NewFSM(
 		"idle",
 		fsm.Events{
-			{Name: "run", Src: []string{"idle"}, Dst: "waiting_for_resa"},
+			{Name: FSMEventDefault, Src: []string{"idle"}, Dst: "waiting_for_resa"},
 			{Name: "resa_received", Src: []string{"idle", "waiting_for_resa"}, Dst: "finished"},
-			{Name: "reset", Src: []string{"finished"}, Dst: "idle"},
+			{Name: "reset", Src: []string{"idle", "waiting_for_resa", "finished"}, Dst: "idle"},
 		},
 		fsm.Callbacks{
-			"run": func(ctx context.Context, e *fsm.Event) {
+			FSMEventDefault: func(ctx context.Context, e *fsm.Event) {
 				log.Debug().Str("callback", "run").Msg("Callback called")
 				msg := &telego.SendMessageParams{}
 				e.FSM.SetMetadata(FSMMetadataMessage, msg)
@@ -38,7 +38,8 @@ func (bot nukiBot) fsmCodeCommand() *fsm.FSM {
 				}
 
 				msg.ReplyMarkup = tu.InlineKeyboard(keyboardButtons)
-				msg.Text = "Select a reservation"
+				msg.ParseMode = telego.ModeMarkdown
+				msg.Text = "What *reservation* do you want the code for ?"
 				msg.ProtectContent = true
 			},
 			"before_resa_received": func(ctx context.Context, e *fsm.Event) {
@@ -61,22 +62,16 @@ func (bot nukiBot) fsmCodeCommand() *fsm.FSM {
 					msg.Text = fmt.Sprintf("Unable to get smartlock auth from API, err=%v", err)
 					return
 				}
+				msg.ParseMode = telego.ModeMarkdown
 				for _, v := range res {
 					if v.Name == data {
-						msg.ParseMode = telego.ModeMarkdown
 						msg.Text = fmt.Sprintf("Code for *%s*: %d", v.Name, v.Code)
 						return
 					}
 				}
-				msg.ParseMode = telego.ModeMarkdown
 				msg.Text = fmt.Sprintf("Unable to find any code for *%s*", data)
 			},
-			"finished": func(ctx context.Context, e *fsm.Event) {
-				log.Debug().Str("callback", "finished").Msg("Callback called")
-				if err := e.FSM.Event(ctx, "reset"); err != nil {
-					log.Error().Err(err).Msg("Cannot reset")
-				}
-			},
+			"finished": finishedFunc,
 		},
 	)
 }
