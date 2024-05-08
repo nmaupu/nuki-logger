@@ -30,13 +30,33 @@ func (c Commands) start(b *nukiBot) error {
 
 	go func() {
 		defer bot.StopLongPolling()
+	POLL:
 		for update := range updates {
+			// Execute all filters before proceeding
+			for _, filterFunc := range b.filters {
+				if !filterFunc(update) {
+					logger := log.With().Logger()
+					if update.Message != nil {
+						logger = logger.With().
+							Int64("from_id", update.Message.From.ID).
+							Str("from_username", update.Message.From.Username).
+							Str("from_firstname", update.Message.From.FirstName).
+							Str("from_lastname", update.Message.From.LastName).
+							Str("from_lang", update.Message.From.LanguageCode).
+							Str("message", update.Message.Text).Logger()
+					}
+					logger.Warn().Msg("Message filtered.")
+					continue POLL
+				}
+			}
+
 			if update.CallbackQuery == nil && update.Message == nil {
 				continue
 			}
 
 			var destinationChatID int64
-			if update.Message != nil && !isPrivateMessage(update) {
+			if update.Message != nil && !IsPrivateMessage(update) {
+
 				// Command are only executed through private messages, deleting message.
 				log.Debug().Msg("Ignoring commands sent to group")
 				err := bot.DeleteMessage(tu.Delete(update.Message.Chat.ChatID(), update.Message.MessageID))
@@ -101,6 +121,6 @@ func (c Commands) start(b *nukiBot) error {
 	return nil
 }
 
-func isPrivateMessage(update telego.Update) bool {
+func IsPrivateMessage(update telego.Update) bool {
 	return update.Message != nil && update.Message.Chat.Type == telego.ChatTypePrivate
 }

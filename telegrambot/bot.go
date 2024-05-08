@@ -13,6 +13,7 @@ import (
 
 type NukiBot interface {
 	Start() error
+	AddFilter(FilterFunc)
 }
 
 type nukiBot struct {
@@ -21,13 +22,15 @@ type nukiBot struct {
 	smartlockReader     nukiapi.SmartlockReader
 	reservationsReader  nukiapi.ReservationsReader
 	smartlockAuthReader nukiapi.SmartlockAuthReader
+	filters             []FilterFunc
 }
 
 func NewNukiBot(sender *messaging.TelegramSender,
 	logsReader nukiapi.LogsReader,
 	smartlockReader nukiapi.SmartlockReader,
 	reservationsReader nukiapi.ReservationsReader,
-	smartlockAuthReader nukiapi.SmartlockAuthReader) NukiBot {
+	smartlockAuthReader nukiapi.SmartlockAuthReader,
+	filters ...FilterFunc) NukiBot {
 
 	return &nukiBot{
 		sender:              sender,
@@ -35,7 +38,12 @@ func NewNukiBot(sender *messaging.TelegramSender,
 		smartlockReader:     smartlockReader,
 		reservationsReader:  reservationsReader,
 		smartlockAuthReader: smartlockAuthReader,
+		filters:             filters,
 	}
+}
+
+func (b *nukiBot) AddFilter(f FilterFunc) {
+	b.filters = append(b.filters, f)
 }
 
 func (b *nukiBot) Start() error {
