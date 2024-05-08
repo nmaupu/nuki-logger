@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/enescakir/emoji"
+	"github.com/looplab/fsm"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 
@@ -16,18 +17,17 @@ var chatSessions = map[int64]Command{}
 type CommandHandler func(update telego.Update, msgResponse *telego.SendMessageParams)
 
 type Command struct {
-	StateMachine FSM
+	StateMachine *fsm.FSM
 	NextFSMEvent string
 	Handler      CommandHandler
-	Callback     CommandHandler
 }
 
 func resetChatSession(chatID int64, cmd *Command) {
 	log.Trace().
 		Int64("chatID", chatID).
 		Msg("Resetting chat session")
-	if cmd != nil && cmd.StateMachine.FSM != nil {
-		if err := cmd.StateMachine.FSM.Event(context.Background(), FSMEventReset); err != nil {
+	if cmd != nil && cmd.StateMachine != nil {
+		if err := cmd.StateMachine.Event(context.Background(), FSMEventReset); err != nil {
 			log.Error().Err(err).Msg("An error occurred resetting chat session")
 		}
 	}
@@ -106,7 +106,6 @@ func (c Commands) start(b *nukiBot) error {
 					Msg("Deleted unwanted group message, sending a private response.")
 			}
 
-
 			var msg *telego.SendMessageParams
 
 			if isCallback(update) { // Callback keyboard's button
@@ -153,20 +152,19 @@ func (c Commands) handleCallback(update telego.Update, destinationChatID int64) 
 	if !ok {
 		return nil, fmt.Errorf("This button is expired, use menu or initiate a new command!")
 	}
-	stateM := command.StateMachine
 
 	log.Debug().
 		Str("msg", update.CallbackQuery.Data).
-		Str("fsm_state", stateM.Current()).
+		Str("fsm_state", command.StateMachine.Current()).
 		Msg("Received callback")
 
 	cmd := GetCommandFromCallbackData(update.CallbackQuery)
 	data := GetDataFromCallbackData(update.CallbackQuery)
-	err := stateM.Event(context.Background(), cmd, data)
+	err := command.StateMachine.Event(context.Background(), cmd, data)
 	if err != nil {
 		return nil, err
 	}
-	return stateM.getMetadataSendMessageParams(FSMMetadataMessage)
+	return getMetadataSendMessageParams(FSMMetadataMessage, command.StateMachine)
 }
 
 func (c Commands) handleMessage(update telego.Update, destinationChatID int64) (*telego.SendMessageParams, error) {
@@ -194,7 +192,7 @@ func (c Commands) handleMessage(update telego.Update, destinationChatID int64) (
 		return msg, nil
 	}
 
-	if command.StateMachine.FSM == nil {
+	if command.StateMachine == nil {
 		return tu.Message(tu.ID(destinationChatID), "internal error, fsm is nil"), nil
 	}
 
@@ -209,11 +207,11 @@ func (c Commands) handleMessage(update telego.Update, destinationChatID int64) (
 		return nil, err
 	}
 	// Get next fsm event from metadata if any
-	command.NextFSMEvent, err = command.StateMachine.getMetadataString(FSMMetadataNextEvent)
+	command.NextFSMEvent, err = getMetadataString(FSMMetadataNextEvent, command.StateMachine)
 	if err != nil {
 		command.NextFSMEvent = ""
 	}
 	chatSessions[destinationChatID] = command
 
-	return command.StateMachine.getMetadataSendMessageParams(FSMMetadataMessage)
+	return getMetadataSendMessageParams(FSMMetadataMessage, command.StateMachine)
 }

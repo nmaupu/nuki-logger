@@ -2,6 +2,7 @@ package telegrambot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/looplab/fsm"
@@ -17,7 +18,7 @@ const (
 )
 
 var (
-	finishedFunc = func(ctx context.Context, e *fsm.Event) {
+	fsmEventFinished = func(ctx context.Context, e *fsm.Event) {
 		log.Debug().Str("callback", "finished").Msg("Callback called")
 		if err := e.FSM.Event(ctx, "reset"); err != nil {
 			log.Error().Err(err).Msg("Cannot reset")
@@ -25,16 +26,12 @@ var (
 	}
 )
 
-type FSM struct {
-	*fsm.FSM
-}
-
 func metadataNotFoundErr(key string) error {
 	return fmt.Errorf("unable to find metadata %s", key)
 }
 
-func (f FSM) getMetadataString(key string) (string, error) {
-	res, ok := f.FSM.Metadata(key)
+func getMetadataString(key string, fsm *fsm.FSM) (string, error) {
+	res, ok := fsm.Metadata(key)
 	if !ok {
 		return "", metadataNotFoundErr(key)
 	}
@@ -45,8 +42,8 @@ func (f FSM) getMetadataString(key string) (string, error) {
 	return str, nil
 }
 
-func (f FSM) getMetadataSendMessageParams(key string) (*telego.SendMessageParams, error) {
-	res, ok := f.FSM.Metadata(key)
+func getMetadataSendMessageParams(key string, fsm *fsm.FSM) (*telego.SendMessageParams, error) {
+	res, ok := fsm.Metadata(key)
 	if !ok {
 		return nil, metadataNotFoundErr(key)
 	}
@@ -55,6 +52,24 @@ func (f FSM) getMetadataSendMessageParams(key string) (*telego.SendMessageParams
 		return nil, metadataNotFoundErr(key)
 	}
 	return msg, nil
+}
+
+func checkFSMArg(e *fsm.Event) (string, error) {
+	if len(e.Args) != 1 {
+		return "", errors.New("invalid data")
+	}
+
+	argData := e.Args[0]
+	data, ok := argData.(string)
+	if !ok {
+		return "", errors.New("data is not a string")
+	}
+
+	if data == "" {
+		return "", errors.New("unknown data")
+	}
+
+	return data, nil
 }
 
 func waitForUserInput(f *fsm.FSM, nextEvent string) {

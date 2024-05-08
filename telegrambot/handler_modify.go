@@ -8,7 +8,7 @@ import (
 )
 
 // reservationPendingModification registers a pending modification. This will be applied when the reservation appears on Nuki side
-// Check in/out time is an int32 representing the number of minutes from midnight stored as standard time
+// Check in/out time is an int32 representing the number of minutes from midnight stored as a go time
 type ReservationPendingModification struct {
 	ReservationID string    `json:"reservation_id"`
 	CheckInTime   time.Time `json:"check_in_time"`

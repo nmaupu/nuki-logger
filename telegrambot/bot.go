@@ -53,9 +53,12 @@ func (b *nukiBot) Start() error {
 		helpItems := slices.DeleteFunc(keys, func(s string) bool { return !strings.HasPrefix(s, "/") })
 		msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(helpItems, ", "))
 	}
+
 	commands["/start"] = Command{Handler: help}
 	commands["/help"] = Command{Handler: help}
 	commands[menuHelp] = Command{Handler: help}
+
+	commands["/menu"] = Command{Handler: b.handlerMenu}
 
 	commands["/battery"] = Command{Handler: b.handlerBattery}
 	commands["/bat"] = Command{Handler: b.handlerBattery}
@@ -65,16 +68,14 @@ func (b *nukiBot) Start() error {
 	commands[menuResas] = Command{Handler: b.handlerResa}
 
 	logsFSM := b.fsmLogsCommand()
-	commands["/logs"] = Command{StateMachine: FSM{logsFSM}}
-	commands[menuLogs] = Command{StateMachine: FSM{logsFSM}}
-
-	commands["/menu"] = Command{Handler: b.handlerMenu}
+	commands["/logs"] = Command{StateMachine: logsFSM}
+	commands[menuLogs] = Command{StateMachine: logsFSM}
 
 	codeFSM := b.fsmCodeCommand()
-	commands["/code"] = Command{StateMachine: FSM{codeFSM}}
-	commands[menuCode] = Command{StateMachine: FSM{codeFSM}}
+	commands["/code"] = Command{StateMachine: codeFSM}
+	commands[menuCode] = Command{StateMachine: codeFSM}
 
-	commands["/name"] = Command{StateMachine: FSM{b.fsmNameCommand()}}
+	commands["/name"] = Command{StateMachine: b.fsmNameCommand()}
 
 	commands["/modify"] = Command{Handler: b.handlerModify}
 	commands[menuModify] = Command{Handler: b.handlerModify}

@@ -48,7 +48,7 @@ func (bot nukiBot) fsmNameCommand() *fsm.FSM {
 				msg.ParseMode = telego.ModeMarkdown
 				msg.Text = fmt.Sprintf("Hello *%s*", data)
 			},
-			"finished": finishedFunc,
+			"finished": fsmEventFinished,
 		},
 	)
 }
