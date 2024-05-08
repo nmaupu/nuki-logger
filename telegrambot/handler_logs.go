@@ -32,7 +32,7 @@ func (bot nukiBot) fsmLogsCommand() *fsm.FSM {
 	)
 }
 
-func (b *nukiBot) fsmEventLogsDefault(ctx context.Context, e *fsm.Event) {
+func (b nukiBot) fsmEventLogsDefault(ctx context.Context, e *fsm.Event) {
 	log.Trace().Str("callback", "run").Msg("Callback called")
 	msg := &telego.SendMessageParams{}
 	e.FSM.SetMetadata(FSMMetadataMessage, msg)
@@ -48,12 +48,12 @@ func (b *nukiBot) fsmEventLogsDefault(ctx context.Context, e *fsm.Event) {
 		),
 	)
 
-	msg.Text = "How many ?"
+	msg.Text = "How many logs do you want to get?"
 	msg.ReplyMarkup = keyboard
 	msg.ProtectContent = true
 }
 
-func (bot *nukiBot) fsmEventLogsNumberReceived(ctx context.Context, e *fsm.Event) {
+func (bot nukiBot) fsmEventLogsNumberReceived(ctx context.Context, e *fsm.Event) {
 	log.Trace().Str("callback", "number_received").Msg("Callback called")
 	msg := &telego.SendMessageParams{}
 	e.FSM.SetMetadata(FSMMetadataMessage, msg)

@@ -118,7 +118,7 @@ func (c Commands) start(b *nukiBot) error {
 					msg = &telego.SendMessageParams{Text: err.Error()}
 				}
 			} else { // Direct message
-				msg, err = c.handleMessage(update, destinationChatID)
+				msg, err = c.handleMessage(bot, update, destinationChatID)
 				if err != nil {
 					msg = &telego.SendMessageParams{Text: err.Error()}
 				}
@@ -167,13 +167,12 @@ func (c Commands) handleCallback(update telego.Update, destinationChatID int64) 
 	return getMetadataSendMessageParams(FSMMetadataMessage, command.StateMachine)
 }
 
-func (c Commands) handleMessage(update telego.Update, destinationChatID int64) (*telego.SendMessageParams, error) {
+func (c Commands) handleMessage(bot *telego.Bot, update telego.Update, destinationChatID int64) (*telego.SendMessageParams, error) {
 	command, ok := c[update.Message.Text]
 	if !ok {
 		// 2 possibilities here:
 		//   - unknown command
 		//   - a response to a previous command as part of a conversation with the bot
-		var ok bool
 		command, ok = chatSessions[destinationChatID]
 		if !ok || command.NextFSMEvent == "" { // Unknown command
 			return tu.Message(tu.ID(destinationChatID), fmt.Sprintf("I don't understand %s", emoji.ManShrugging.String())), nil
@@ -204,7 +203,18 @@ func (c Commands) handleMessage(update telego.Update, destinationChatID int64) (
 
 	err := command.StateMachine.Event(context.Background(), command.GetNextFSMEvent(), update.Message.Text)
 	if err != nil {
-		return nil, err
+		if errRecoverEvent, _ := getMetadataString(FSMMetadataErrRecoverEvent, command.StateMachine); errRecoverEvent != "" {
+			// Send error message to the client
+			if _, err := bot.SendMessage(tu.Message(tu.ID(destinationChatID), err.Error())); err != nil {
+				log.Error().Err(err).Send()
+			}
+			// Transition to the recover event
+			if err := command.StateMachine.Event(context.Background(), errRecoverEvent); err != nil {
+				log.Error().Err(err).Msg("An error occurred calling error callback")
+			}
+		} else {
+			return nil, err
+		}
 	}
 	// Get next fsm event from metadata if any
 	command.NextFSMEvent, err = getMetadataString(FSMMetadataNextEvent, command.StateMachine)

@@ -77,8 +77,9 @@ func (b *nukiBot) Start() error {
 
 	commands["/name"] = Command{StateMachine: b.fsmNameCommand()}
 
-	commands["/modify"] = Command{Handler: b.handlerModify}
-	commands[menuModify] = Command{Handler: b.handlerModify}
+	modifyFSM := b.fsmModifyCommand()
+	commands["/modify"] = Command{StateMachine: modifyFSM}
+	commands[menuModify] = Command{StateMachine: modifyFSM}
 
 	return commands.start(b)
 }

@@ -27,7 +27,7 @@ func (bot nukiBot) fsmCodeCommand() *fsm.FSM {
 }
 
 func (bot nukiBot) fsmEventCodeDefault(ctx context.Context, e *fsm.Event) {
-	log.Debug().Str("callback", "run").Msg("Callback called")
+	log.Debug().Str("callback", FSMEventDefault).Msg("Callback called")
 	msg := &telego.SendMessageParams{}
 	e.FSM.SetMetadata(FSMMetadataMessage, msg)
 
@@ -53,8 +53,7 @@ func (bot nukiBot) fsmEventCodeDefault(ctx context.Context, e *fsm.Event) {
 
 func (bot nukiBot) fsmEventCodeResaReceived(ctx context.Context, e *fsm.Event) {
 	log.Debug().Str("callback", "resa_received").Msg("Callback called")
-	msg := &telego.SendMessageParams{}
-	e.FSM.SetMetadata(FSMMetadataMessage, msg)
+	msg := reinitMetadataMessage(e.FSM)
 
 	data, err := checkFSMArg(e)
 	if err != nil {

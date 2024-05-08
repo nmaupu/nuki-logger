@@ -4,9 +4,9 @@ go 1.22
 
 require (
 	github.com/enescakir/emoji v1.0.0
+	github.com/looplab/fsm v1.0.1
 	github.com/mymmrac/telego v0.29.2
 	github.com/rs/zerolog v1.32.0
-	github.com/sa-/slicefunk v0.1.4
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
@@ -24,7 +24,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.17.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
-	github.com/looplab/fsm v1.0.1 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

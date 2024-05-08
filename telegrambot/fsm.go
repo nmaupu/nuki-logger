@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	FSMEventDefault      = "run"
-	FSMEventReset        = "reset"
-	FSMMetadataNextEvent = "next_event"
-	FSMMetadataMessage   = "msg"
+	FSMEventDefault            = "run"
+	FSMEventReset              = "reset"
+	FSMMetadataNextEvent       = "next_event"
+	FSMMetadataMessage         = "msg"
+	FSMMetadataErrRecoverEvent = "err_recover_event"
 )
 
 var (
@@ -28,6 +29,18 @@ var (
 
 func metadataNotFoundErr(key string) error {
 	return fmt.Errorf("unable to find metadata %s", key)
+}
+
+func getMetadataReservationPendingModification(key string, fsm *fsm.FSM) (*ReservationPendingModification, error) {
+	res, ok := fsm.Metadata(key)
+	if !ok {
+		return nil, metadataNotFoundErr(key)
+	}
+	m, ok := res.(*ReservationPendingModification)
+	if !ok {
+		return nil, metadataNotFoundErr(key)
+	}
+	return m, nil
 }
 
 func getMetadataString(key string, fsm *fsm.FSM) (string, error) {
@@ -52,6 +65,12 @@ func getMetadataSendMessageParams(key string, fsm *fsm.FSM) (*telego.SendMessage
 		return nil, metadataNotFoundErr(key)
 	}
 	return msg, nil
+}
+
+func reinitMetadataMessage(fsm *fsm.FSM) *telego.SendMessageParams {
+	msg := &telego.SendMessageParams{}
+	fsm.SetMetadata(FSMMetadataMessage, msg)
+	return msg
 }
 
 func checkFSMArg(e *fsm.Event) (string, error) {
@@ -82,4 +101,9 @@ func userInputReceived(f *fsm.FSM) {
 
 func userInputReset(f *fsm.FSM) {
 	f.SetMetadata(FSMMetadataNextEvent, "")
+}
+
+func fsmRuntimeErr(e *fsm.Event, err error, recoverEvent string) {
+	e.Err = err
+	e.FSM.SetMetadata(FSMMetadataErrRecoverEvent, recoverEvent)
 }
