@@ -14,8 +14,9 @@ type Config struct {
 	AddressID    int64          `mapstructure:"address_id"`
 	Senders      []SenderConfig `mapstructure:"senders"`
 	TelegramBot  struct {
-		Enabled    bool   `mapstructure:"enabled"`
-		SenderName string `mapstructure:"sender_name"`
+		Enabled           bool    `mapstructure:"enabled"`
+		SenderName        string  `mapstructure:"sender_name"`
+		RestrictToChatIDs []int64 `mapstructure:"restrict_private_chat_ids"`
 	} `mapstructure:"telegram_bot"`
 	LogsReader          nukiapi.LogsReader          `mapstructure:"-"`
 	SmartlockReader     nukiapi.SmartlockReader     `mapstructure:"-"`

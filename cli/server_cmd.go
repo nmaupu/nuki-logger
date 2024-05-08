@@ -3,10 +3,12 @@ package cli
 import (
 	"os"
 	"os/signal"
+	"slices"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/mymmrac/telego"
 	"github.com/nmaupu/nuki-logger/cache"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/model"
@@ -72,6 +74,17 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			config.SmartlockReader,
 			config.ReservationsReader,
 			config.SmartlockAuthReader)
+		if len(config.TelegramBot.RestrictToChatIDs) > 0 {
+			log.Info().
+				Ints64("chat_ids", config.TelegramBot.RestrictToChatIDs).
+				Msg("Restricting bot access")
+			nukiBot.AddFilter(func(update telego.Update) bool {
+				if update.Message == nil || !telegrambot.IsPrivateMessage(update) {
+					return true
+				}
+				return slices.Contains(config.TelegramBot.RestrictToChatIDs, update.Message.From.ID)
+			})
+		}
 
 		if err := nukiBot.Start(); err != nil {
 			return err

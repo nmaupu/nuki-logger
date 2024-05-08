@@ -30,13 +30,39 @@ func (c Commands) start(b *nukiBot) error {
 
 	go func() {
 		defer bot.StopLongPolling()
+	POLL:
 		for update := range updates {
+			// Execute all filters before proceeding
+			for _, filterFunc := range b.filters {
+				if !filterFunc(update) {
+					logger := log.With().Logger()
+					if update.Message != nil {
+						logger = logger.With().
+							Int64("from_id", update.Message.From.ID).
+							Str("from_username", update.Message.From.Username).
+							Str("from_firstname", update.Message.From.FirstName).
+							Str("from_lastname", update.Message.From.LastName).
+							Str("from_lang", update.Message.From.LanguageCode).
+							Str("message", update.Message.Text).Logger()
+					}
+					logger.Warn().Msg("Message filtered.")
+					continue POLL
+				}
+			}
+
 			if update.CallbackQuery == nil && update.Message == nil {
 				continue
 			}
 
+			// Init destinationChatID
 			var destinationChatID int64
-			if update.Message != nil && !isPrivateMessage(update) {
+			if update.Message != nil {
+				destinationChatID = update.Message.Chat.ID
+			} else {
+				destinationChatID = update.CallbackQuery.Message.GetChat().ID
+			}
+
+			if update.Message != nil && !IsPrivateMessage(update) {
 				// Command are only executed through private messages, deleting message.
 				log.Debug().Msg("Ignoring commands sent to group")
 				err := bot.DeleteMessage(tu.Delete(update.Message.Chat.ChatID(), update.Message.MessageID))
@@ -48,7 +74,10 @@ func (c Commands) start(b *nukiBot) error {
 						Msg("Unable to delete unwanted message")
 				}
 				// if it's a command: answer response to the member
-				destinationChatID = int64(update.Message.From.ID)
+				destinationChatID = update.Message.From.ID
+				log.Debug().
+					Int64("from_id", destinationChatID).
+					Msg("Deleted unwanted group message, sending a private response.")
 			}
 
 			var command string
@@ -70,14 +99,6 @@ func (c Commands) start(b *nukiBot) error {
 				command, _ = strings.CutPrefix(update.Message.Text, "/")
 			}
 
-			if destinationChatID == 0 {
-				if update.Message != nil {
-					destinationChatID = update.Message.Chat.ID
-				} else {
-					destinationChatID = update.CallbackQuery.Message.GetChat().ID
-				}
-			}
-
 			msgToSend := tu.Message(tu.ID(destinationChatID), "")
 			msgToSend.ParseMode = telego.ModeMarkdown
 
@@ -95,12 +116,17 @@ func (c Commands) start(b *nukiBot) error {
 					_ = bot.AnswerCallbackQuery(tu.CallbackQuery(update.CallbackQuery.ID))
 				}
 			}
+
+			log.Trace().
+				Int64("to_id", destinationChatID).
+				Str("message", msgToSend.Text).
+				Msg("Sending message")
 			_, _ = bot.SendMessage(msgToSend)
 		}
 	}()
 	return nil
 }
 
-func isPrivateMessage(update telego.Update) bool {
+func IsPrivateMessage(update telego.Update) bool {
 	return update.Message != nil && update.Message.Chat.Type == telego.ChatTypePrivate
 }

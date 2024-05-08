@@ -5,6 +5,9 @@ nuki_api_token: token
 telegram_bot:
   enabled: true
   sender_name: telegram
+  restrict_private_chat_ids:
+    - 12345
+    - 67890
 senders:
   - name: telegram
     telegram:
