@@ -9,30 +9,9 @@ import (
 	"github.com/looplab/fsm"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
+	"github.com/nmaupu/nuki-logger/model"
 	"github.com/rs/zerolog/log"
 )
-
-const (
-	FormatTimeHoursMinutes = "15:04"
-)
-
-var reservationPendingModifications = map[string]ReservationPendingModification{}
-
-// reservationPendingModification registers a pending modification. This will be applied when the reservation appears on Nuki side
-// Check in/out time is an int32 representing the number of minutes from midnight stored as a go time
-type ReservationPendingModification struct {
-	ReservationID string    `json:"reservation_id"`
-	CheckInTime   time.Time `json:"check_in_time"`
-	CheckOutTime  time.Time `json:"check_out_time"`
-}
-
-func (r ReservationPendingModification) FormatCheckIn() string {
-	return r.CheckInTime.Format(FormatTimeHoursMinutes)
-}
-
-func (r ReservationPendingModification) FormatCheckOut() string {
-	return r.CheckOutTime.Format(FormatTimeHoursMinutes)
-}
 
 func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 	const (
@@ -77,14 +56,14 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 
 				data, _ := checkFSMArg(e)
 
-				e.FSM.SetMetadata(metadataPendingModif, &ReservationPendingModification{
+				e.FSM.SetMetadata(metadataPendingModif, &model.ReservationPendingModification{
 					ReservationID: data,
 				})
 			},
 			"wait_check_in": func(ctx context.Context, e *fsm.Event) {
 				log.Debug().Str("callback", "wait_check_in").Msg("Callback called")
 				msg := reinitMetadataMessage(e.FSM)
-				msg.Text = fmt.Sprintf("Enter check-in time (format: %s)", FormatTimeHoursMinutes)
+				msg.Text = fmt.Sprintf("Enter check-in time (format: %s)", model.FormatTimeHoursMinutes)
 				waitForUserInput(e.FSM, "check_in_received")
 			},
 			"before_check_in_received": func(ctx context.Context, e *fsm.Event) {
@@ -96,19 +75,19 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 
 				modif, err := getMetadataReservationPendingModification(metadataPendingModif, e.FSM)
 				if err != nil {
-					fsmRuntimeErr(e, err, "reset")
+					fsmRuntimeErr(e, err.Error(), "reset")
 					return
 				}
 
-				modif.CheckInTime, err = time.Parse(FormatTimeHoursMinutes, data)
+				modif.CheckInTime, err = time.Parse(model.FormatTimeHoursMinutes, data)
 				if err != nil {
-					fsmRuntimeErr(e, fmt.Errorf("unable to parse %s", data), "recover_check_in")
+					fsmRuntimeErr(e, fmt.Sprintf("unable to parse %s", data), "recover_check_in")
 				}
 			},
 			"wait_check_out": func(ctx context.Context, e *fsm.Event) {
 				log.Debug().Str("callback", "wait_check_out").Msg("Callback called")
 				msg := reinitMetadataMessage(e.FSM)
-				msg.Text = fmt.Sprintf("Enter check-out time (format: %s)", FormatTimeHoursMinutes)
+				msg.Text = fmt.Sprintf("Enter check-out time (format: %s)", model.FormatTimeHoursMinutes)
 				waitForUserInput(e.FSM, "check_out_received")
 			},
 			"before_check_out_received": func(ctx context.Context, e *fsm.Event) {
@@ -120,13 +99,13 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 
 				modif, err := getMetadataReservationPendingModification(metadataPendingModif, e.FSM)
 				if err != nil {
-					fsmRuntimeErr(e, fmt.Errorf("An error occurred, %s", err.Error()), "reset")
+					fsmRuntimeErr(e, fmt.Sprintf("An error occurred, %s", err.Error()), "reset")
 					return
 				}
 
-				modif.CheckOutTime, err = time.Parse(FormatTimeHoursMinutes, data)
+				modif.CheckOutTime, err = time.Parse(model.FormatTimeHoursMinutes, data)
 				if err != nil {
-					fsmRuntimeErr(e, fmt.Errorf("unable to parse %s", data), "recover_check_out")
+					fsmRuntimeErr(e, fmt.Sprintf("unable to parse %s", data), "recover_check_out")
 				}
 			},
 			"wait_confirmation": func(ctx context.Context, e *fsm.Event) {
@@ -135,7 +114,7 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 
 				modif, err := getMetadataReservationPendingModification(metadataPendingModif, e.FSM)
 				if err != nil {
-					fsmRuntimeErr(e, fmt.Errorf("An error occurred, %s", err.Error()), "reset")
+					fsmRuntimeErr(e, fmt.Sprintf("An error occurred, %s", err.Error()), "reset")
 					return
 				}
 
@@ -159,7 +138,14 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 				msg := reinitMetadataMessage(e.FSM)
 				data, _ := checkFSMArg(e)
 
+				modif, err := getMetadataReservationPendingModification(metadataPendingModif, e.FSM)
+				if err != nil {
+					fsmRuntimeErr(e, fmt.Sprintf("An error occurred, %s", err.Error()), "reset")
+					return
+				}
+
 				if data == "yes" {
+					bot.reservationPendingModificationRoutine.AddPendingModification(*modif)
 					msg.Text = "Confirmed!"
 				} else {
 					msg.Text = "Canceled..."
@@ -168,9 +154,4 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 			"finished": fsmEventFinished,
 		},
 	)
-}
-
-func minutesFromMidnight(t time.Time) int32 {
-	h, m, _ := t.Clock()
-	return int32(h*60 + m)
 }

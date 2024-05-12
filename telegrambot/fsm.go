@@ -7,6 +7,7 @@ import (
 
 	"github.com/looplab/fsm"
 	"github.com/mymmrac/telego"
+	"github.com/nmaupu/nuki-logger/model"
 	"github.com/rs/zerolog/log"
 )
 
@@ -31,12 +32,12 @@ func metadataNotFoundErr(key string) error {
 	return fmt.Errorf("unable to find metadata %s", key)
 }
 
-func getMetadataReservationPendingModification(key string, fsm *fsm.FSM) (*ReservationPendingModification, error) {
+func getMetadataReservationPendingModification(key string, fsm *fsm.FSM) (*model.ReservationPendingModification, error) {
 	res, ok := fsm.Metadata(key)
 	if !ok {
 		return nil, metadataNotFoundErr(key)
 	}
-	m, ok := res.(*ReservationPendingModification)
+	m, ok := res.(*model.ReservationPendingModification)
 	if !ok {
 		return nil, metadataNotFoundErr(key)
 	}
@@ -103,7 +104,7 @@ func userInputReset(f *fsm.FSM) {
 	f.SetMetadata(FSMMetadataNextEvent, "")
 }
 
-func fsmRuntimeErr(e *fsm.Event, err error, recoverEvent string) {
-	e.Err = err
+func fsmRuntimeErr(e *fsm.Event, errStr string, recoverEvent string) {
+	e.Err = errors.New(errStr)
 	e.FSM.SetMetadata(FSMMetadataErrRecoverEvent, recoverEvent)
 }

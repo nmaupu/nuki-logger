@@ -11,19 +11,20 @@ import (
 )
 
 var (
-	menuBattery = fmt.Sprintf("%s %s", emoji.Battery.String(), "battery")
-	menuCode    = fmt.Sprintf("%s %s", emoji.InputNumbers.String(), "code")
-	menuHelp    = fmt.Sprintf("%s %s", emoji.QuestionMark.String(), "help")
-	menuLogs    = fmt.Sprintf("%s %s", emoji.FileFolder.String(), "logs")
-	menuResas   = fmt.Sprintf("%s %s", emoji.OpenBook.String(), "resas")
-	menuModify  = fmt.Sprintf("%s %s", emoji.Gear.String(), "modify")
+	menuBattery    = fmt.Sprintf("%s %s", emoji.Battery.String(), "Battery")
+	menuCode       = fmt.Sprintf("%s %s", emoji.InputNumbers.String(), "Code")
+	menuHelp       = fmt.Sprintf("%s %s", emoji.QuestionMark.String(), "Help")
+	menuLogs       = fmt.Sprintf("%s %s", emoji.FileFolder.String(), "Logs")
+	menuResas      = fmt.Sprintf("%s %s", emoji.OpenBook.String(), "Resas")
+	menuListModify = fmt.Sprintf("%s %s", emoji.Pencil.String(), "List modifs")
+	menuModify     = fmt.Sprintf("%s %s", emoji.Gear.String(), "Modify")
 )
 
 func (b *nukiBot) handlerMenu(update telego.Update, msg *telego.SendMessageParams) {
 	log.Debug().Msg("menuHandler called")
 	keyboard := tu.Keyboard(
 		tu.KeyboardRow(tu.KeyboardButton(menuBattery), tu.KeyboardButton(menuLogs), tu.KeyboardButton(menuCode)),
-		tu.KeyboardRow(tu.KeyboardButton(menuResas), tu.KeyboardButton(menuModify)),
+		tu.KeyboardRow(tu.KeyboardButton(menuResas), tu.KeyboardButton(menuModify), tu.KeyboardButton(menuListModify)),
 		tu.KeyboardRow(tu.KeyboardButton(menuHelp)),
 	).WithResizeKeyboard().WithInputFieldPlaceholder("Menu")
 

@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mymmrac/telego"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/nukiapi"
+	tgbroutine "github.com/nmaupu/nuki-logger/telegrambot/routine"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/exp/maps"
 )
 
@@ -17,12 +20,13 @@ type NukiBot interface {
 }
 
 type nukiBot struct {
-	Sender              *messaging.TelegramSender
-	LogsReader          nukiapi.LogsReader
-	SmartlockReader     nukiapi.SmartlockReader
-	ReservationsReader  nukiapi.ReservationsReader
-	SmartlockAuthReader nukiapi.SmartlockAuthReader
-	filters             []FilterFunc
+	Sender                                *messaging.TelegramSender
+	LogsReader                            nukiapi.LogsReader
+	SmartlockReader                       nukiapi.SmartlockReader
+	ReservationsReader                    nukiapi.ReservationsReader
+	SmartlockAuthReader                   nukiapi.SmartlockAuthReader
+	filters                               []FilterFunc
+	reservationPendingModificationRoutine tgbroutine.ReservationPendingModificationRoutine
 }
 
 func NewNukiBot(sender *messaging.TelegramSender,
@@ -32,6 +36,10 @@ func NewNukiBot(sender *messaging.TelegramSender,
 	smartlockAuthReader nukiapi.SmartlockAuthReader,
 	filters ...FilterFunc) NukiBot {
 
+	resaTimeModifier := nukiapi.ReservationTimeModifier{
+		APICaller: nukiapi.APICaller{Token: reservationsReader.Token},
+		AddressID: reservationsReader.AddressID,
+	}
 	return &nukiBot{
 		Sender:              sender,
 		LogsReader:          logsReader,
@@ -39,6 +47,13 @@ func NewNukiBot(sender *messaging.TelegramSender,
 		ReservationsReader:  reservationsReader,
 		SmartlockAuthReader: smartlockAuthReader,
 		filters:             filters,
+		reservationPendingModificationRoutine: tgbroutine.NewReservationPendingModificationRoutine(
+			reservationsReader,
+			resaTimeModifier,
+			func(e error) {
+				log.Error().Err(e).Msg("An error occurred processing pending reservations")
+			},
+		),
 	}
 }
 
@@ -81,5 +96,11 @@ func (b *nukiBot) Start() error {
 	commands["/modify"] = Command{StateMachine: modifyFSM}
 	commands[menuModify] = Command{StateMachine: modifyFSM}
 
+	commands["/listmodify"] = Command{Handler: b.handlerListModify}
+	commands[menuListModify] = Command{Handler: b.handlerListModify}
+
+	commands["/deletemodify"] = Command{StateMachine: b.fsmDeleteModifyCommand()}
+
+	b.reservationPendingModificationRoutine.Start(time.Second * 10)
 	return commands.start(b)
 }

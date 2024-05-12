@@ -28,13 +28,16 @@ func (bot nukiBot) fsmCodeCommand() *fsm.FSM {
 
 func (bot nukiBot) fsmEventCodeDefault(ctx context.Context, e *fsm.Event) {
 	log.Debug().Str("callback", FSMEventDefault).Msg("Callback called")
-	msg := &telego.SendMessageParams{}
-	e.FSM.SetMetadata(FSMMetadataMessage, msg)
+	msg := reinitMetadataMessage(e.FSM)
 
 	res, err := bot.ReservationsReader.Execute()
 	if err != nil {
-		msg.Text = fmt.Sprintf("Unable to get reservations from API, err=%v", err)
+		fsmRuntimeErr(e, fmt.Sprintf("Unable to get reservations from API, err=%v", err), "reset")
 		return
+	}
+
+	if len(res) == 0 {
+		fsmRuntimeErr(e, "No reservation available", "reset")
 	}
 
 	var keyboardButtons []telego.InlineKeyboardButton
@@ -46,7 +49,7 @@ func (bot nukiBot) fsmEventCodeDefault(ctx context.Context, e *fsm.Event) {
 
 	msg.ReplyMarkup = tu.InlineKeyboard(keyboardButtons)
 	msg.ParseMode = telego.ModeMarkdown
-	msg.Text = "What *reservation* do you want the code for ?"
+	msg.Text = "What *reservation* do you want the code for?"
 	msg.ProtectContent = true
 
 }
