@@ -23,25 +23,28 @@ type ReservationPendingModificationRoutine interface {
 	AddPendingModification(r model.ReservationPendingModification)
 	GetAllPendingModifications() []model.ReservationPendingModification
 	DeletePendingModification(resaID string)
+	AddOnErrorListener(func(rpm *model.ReservationPendingModification, err error))
+	AddOnModificationDoneListener(func(rpm *model.ReservationPendingModification))
 }
 
 type reservationPendingModificationRoutine struct {
-	pendings                map[string]*model.ReservationPendingModification
-	messages                chan model.ReservationPendingModification
-	mutexRPM                sync.Mutex
-	reservationReader       nukiapi.ReservationsReader
-	reservationTimeModifier nukiapi.ReservationTimeModifier
-	errorsCallback          func(err error)
+	pendings                    map[string]*model.ReservationPendingModification
+	messages                    chan model.ReservationPendingModification
+	mutexRPM                    sync.Mutex
+	reservationReader           nukiapi.ReservationsReader
+	reservationTimeModifier     nukiapi.ReservationTimeModifier
+	mutexListeners              sync.Mutex
+	onErrorListeners            []func(rpm *model.ReservationPendingModification, err error)
+	onModificationDoneListeners []func(rpm *model.ReservationPendingModification)
 }
 
-func NewReservationPendingModificationRoutine(reader nukiapi.ReservationsReader, writer nukiapi.ReservationTimeModifier, errorsCallback func(err error)) *reservationPendingModificationRoutine {
+func NewReservationPendingModificationRoutine(reader nukiapi.ReservationsReader, writer nukiapi.ReservationTimeModifier) *reservationPendingModificationRoutine {
 	return &reservationPendingModificationRoutine{
 		pendings:                make(map[string]*model.ReservationPendingModification),
 		messages:                make(chan model.ReservationPendingModification),
 		mutexRPM:                sync.Mutex{},
 		reservationReader:       reader,
 		reservationTimeModifier: writer,
-		errorsCallback:          errorsCallback,
 	}
 }
 
@@ -65,6 +68,18 @@ func (r *reservationPendingModificationRoutine) GetAllPendingModifications() []m
 	return res
 }
 
+func (r *reservationPendingModificationRoutine) AddOnErrorListener(f func(rpm *model.ReservationPendingModification, err error)) {
+	r.mutexListeners.Lock()
+	defer r.mutexListeners.Unlock()
+	r.onErrorListeners = append(r.onErrorListeners, f)
+}
+
+func (r *reservationPendingModificationRoutine) AddOnModificationDoneListener(f func(rpm *model.ReservationPendingModification)) {
+	r.mutexListeners.Lock()
+	defer r.mutexListeners.Unlock()
+	r.onModificationDoneListeners = append(r.onModificationDoneListeners, f)
+}
+
 func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duration) {
 	go func() {
 		interrupt := make(chan os.Signal, 1)
@@ -80,10 +95,7 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 				// Get all reservations from API
 				allResas, err := r.reservationReader.Execute()
 				if err != nil {
-					log.Error().Err(err).Send()
-					if r.errorsCallback != nil {
-						r.errorsCallback(ErrCannotGetReservationsFromAPI{err})
-					}
+					r.dispatchErrorsToListeners(nil, ErrCannotGetReservationsFromAPI{err})
 				}
 
 				// Getting all pending modifications and do the change
@@ -100,12 +112,13 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 							model.MinutesFromMidnight(pendingResa.CheckOutTime),
 						)
 						if err != nil {
-							log.Error().Err(err).Msg("Unable to process pending modification")
+							r.dispatchErrorsToListeners(pendingResa, err)
 							continue
 						}
 						pendingResa.ModificationDone = true
 						linkedResa := resa
 						pendingResa.LinkedReservation = &linkedResa
+						r.dispatchModificationDoneToListeners(pendingResa)
 					}
 				}
 				r.mutexRPM.Unlock()
@@ -122,4 +135,24 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 			}
 		}
 	}()
+}
+
+func (r *reservationPendingModificationRoutine) dispatchErrorsToListeners(rpm *model.ReservationPendingModification, e error) {
+	r.mutexListeners.Lock()
+	defer r.mutexListeners.Unlock()
+	for _, fn := range r.onErrorListeners {
+		if fn != nil {
+			fn(rpm, e)
+		}
+	}
+}
+
+func (r *reservationPendingModificationRoutine) dispatchModificationDoneToListeners(rpm *model.ReservationPendingModification) {
+	r.mutexListeners.Lock()
+	defer r.mutexListeners.Unlock()
+	for _, fn := range r.onModificationDoneListeners {
+		if fn != nil {
+			fn(rpm)
+		}
+	}
 }

@@ -17,6 +17,7 @@ const (
 	FSMMetadataNextEvent       = "next_event"
 	FSMMetadataMessage         = "msg"
 	FSMMetadataErrRecoverEvent = "err_recover_event"
+	FSMMetadataTelegoUpdate    = "telego_update"
 )
 
 var (
@@ -62,6 +63,18 @@ func getMetadataSendMessageParams(key string, fsm *fsm.FSM) (*telego.SendMessage
 		return nil, metadataNotFoundErr(key)
 	}
 	msg, ok := res.(*telego.SendMessageParams)
+	if !ok {
+		return nil, metadataNotFoundErr(key)
+	}
+	return msg, nil
+}
+
+func getMetadataTelegoUpdate(key string, fsm *fsm.FSM) (*telego.Update, error) {
+	res, ok := fsm.Metadata(key)
+	if !ok {
+		return nil, metadataNotFoundErr(key)
+	}
+	msg, ok := res.(*telego.Update)
 	if !ok {
 		return nil, metadataNotFoundErr(key)
 	}

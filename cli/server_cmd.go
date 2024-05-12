@@ -69,11 +69,15 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			return err
 		}
 		tgSender := tgSenderInterface.(*messaging.TelegramSender)
-		nukiBot := telegrambot.NewNukiBot(tgSender,
+		nukiBot, err := telegrambot.NewNukiBot(tgSender,
 			config.LogsReader,
 			config.SmartlockReader,
 			config.ReservationsReader,
 			config.SmartlockAuthReader)
+		if err != nil {
+			return err
+		}
+
 		if len(config.TelegramBot.RestrictToChatIDs) > 0 {
 			log.Info().
 				Ints64("chat_ids", config.TelegramBot.RestrictToChatIDs).

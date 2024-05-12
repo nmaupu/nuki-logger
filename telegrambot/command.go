@@ -44,18 +44,13 @@ func (c Command) GetNextFSMEvent() string {
 }
 
 func (c Commands) start(b *nukiBot) error {
-	bot, err := telego.NewBot(b.Sender.Token)
-	if err != nil {
-		return err
-	}
-
-	updates, err := bot.UpdatesViaLongPolling(nil)
+	updates, err := b.bot.UpdatesViaLongPolling(nil)
 	if err != nil {
 		return err
 	}
 
 	go func() {
-		defer bot.StopLongPolling()
+		defer b.bot.StopLongPolling()
 	POLL:
 		for update := range updates {
 			// Execute all filters before proceeding
@@ -91,7 +86,7 @@ func (c Commands) start(b *nukiBot) error {
 			if update.Message != nil && !IsPrivateMessage(update) {
 				// Command are only executed through private messages, deleting message.
 				log.Debug().Msg("Ignoring commands sent to group")
-				err := bot.DeleteMessage(tu.Delete(update.Message.Chat.ChatID(), update.Message.MessageID))
+				err := b.bot.DeleteMessage(tu.Delete(update.Message.Chat.ChatID(), update.Message.MessageID))
 				if err != nil {
 					log.Error().Err(err).
 						Int64("chat_id", update.Message.Chat.ID).
@@ -109,7 +104,7 @@ func (c Commands) start(b *nukiBot) error {
 			var msg *telego.SendMessageParams
 
 			if isCallback(update) { // Callback keyboard's button
-				if err := bot.AnswerCallbackQuery(tu.CallbackQuery(update.CallbackQuery.ID)); err != nil {
+				if err := b.bot.AnswerCallbackQuery(tu.CallbackQuery(update.CallbackQuery.ID)); err != nil {
 					log.Error().Err(err).Msg("Unable to answer callback.")
 				}
 
@@ -118,7 +113,7 @@ func (c Commands) start(b *nukiBot) error {
 					msg = &telego.SendMessageParams{Text: err.Error()}
 				}
 			} else { // Direct message
-				msg, err = c.handleMessage(bot, update, destinationChatID)
+				msg, err = c.handleMessage(b.bot, update, destinationChatID)
 				if err != nil {
 					msg = &telego.SendMessageParams{Text: err.Error()}
 				}
@@ -126,7 +121,7 @@ func (c Commands) start(b *nukiBot) error {
 
 			// Sending message to client
 			msg.ChatID = tu.ID(destinationChatID)
-			_, err := bot.SendMessage(msg)
+			_, err := b.bot.SendMessage(msg)
 			if err != nil {
 				log.Error().Err(err).
 					Str("msg", msg.Text).
@@ -160,6 +155,7 @@ func (c Commands) handleCallback(update telego.Update, destinationChatID int64) 
 
 	cmd := GetCommandFromCallbackData(update.CallbackQuery)
 	data := GetDataFromCallbackData(update.CallbackQuery)
+	command.StateMachine.SetMetadata(FSMMetadataTelegoUpdate, &update)
 	err := command.StateMachine.Event(context.Background(), cmd, data)
 	if err != nil {
 		return nil, err
@@ -201,6 +197,7 @@ func (c Commands) handleMessage(bot *telego.Bot, update telego.Update, destinati
 		Str("next_fsm_event", command.GetNextFSMEvent()).
 		Msgf("Telegram message received.")
 
+	command.StateMachine.SetMetadata(FSMMetadataTelegoUpdate, &update)
 	err := command.StateMachine.Event(context.Background(), command.GetNextFSMEvent(), update.Message.Text)
 	if err != nil {
 		if errRecoverEvent, _ := getMetadataString(FSMMetadataErrRecoverEvent, command.StateMachine); errRecoverEvent != "" {
@@ -209,6 +206,7 @@ func (c Commands) handleMessage(bot *telego.Bot, update telego.Update, destinati
 				log.Error().Err(err).Send()
 			}
 			// Transition to the recover event
+			command.StateMachine.SetMetadata(FSMMetadataTelegoUpdate, &update)
 			if err := command.StateMachine.Event(context.Background(), errRecoverEvent); err != nil {
 				log.Error().Err(err).Msg("An error occurred calling error callback")
 			}

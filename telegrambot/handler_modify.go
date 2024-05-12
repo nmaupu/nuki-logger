@@ -56,8 +56,15 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 
 				data, _ := checkFSMArg(e)
 
+				update, err := getMetadataTelegoUpdate(FSMMetadataTelegoUpdate, e.FSM)
+				if err != nil {
+					fsmRuntimeErr(e, err.Error(), "reset")
+					return
+				}
+
 				e.FSM.SetMetadata(metadataPendingModif, &model.ReservationPendingModification{
 					ReservationID: data,
+					FromChatID:    update.Message.From.ID,
 				})
 			},
 			"wait_check_in": func(ctx context.Context, e *fsm.Event) {
@@ -82,6 +89,7 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 				modif.CheckInTime, err = time.Parse(model.FormatTimeHoursMinutes, data)
 				if err != nil {
 					fsmRuntimeErr(e, fmt.Sprintf("unable to parse %s", data), "recover_check_in")
+					return
 				}
 			},
 			"wait_check_out": func(ctx context.Context, e *fsm.Event) {
@@ -106,6 +114,7 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 				modif.CheckOutTime, err = time.Parse(model.FormatTimeHoursMinutes, data)
 				if err != nil {
 					fsmRuntimeErr(e, fmt.Sprintf("unable to parse %s", data), "recover_check_out")
+					return
 				}
 			},
 			"wait_confirmation": func(ctx context.Context, e *fsm.Event) {

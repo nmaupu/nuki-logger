@@ -18,6 +18,7 @@ type ReservationPendingModification struct {
 	CheckOutTime      time.Time                `json:"check_out_time"`
 	ModificationDone  bool                     `json:"modification_done"`
 	LinkedReservation *NukiReservationResponse `json:"linked_reservation"`
+	FromChatID        int64                    `json:"from_chat_id"`
 }
 
 func (r ReservationPendingModification) FormatCheckIn() string {
@@ -33,7 +34,8 @@ func (r ReservationPendingModification) MarshalZerologObject(e *zerolog.Event) {
 		Time("check_in", r.CheckInTime).
 		Time("check_out", r.CheckOutTime).
 		Bool("modification_done", r.ModificationDone).
-		Bool("linked_reservation_is_nil", r.LinkedReservation == nil)
+		Bool("linked_reservation_is_nil", r.LinkedReservation == nil).
+		Int64("from_chat_id", r.FromChatID)
 }
 
 func MinutesFromMidnight(t time.Time) int32 {

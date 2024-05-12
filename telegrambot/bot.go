@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/mymmrac/telego"
+	tu "github.com/mymmrac/telego/telegoutil"
 	"github.com/nmaupu/nuki-logger/messaging"
+	"github.com/nmaupu/nuki-logger/model"
 	"github.com/nmaupu/nuki-logger/nukiapi"
 	tgbroutine "github.com/nmaupu/nuki-logger/telegrambot/routine"
 	"github.com/rs/zerolog/log"
@@ -20,6 +22,7 @@ type NukiBot interface {
 }
 
 type nukiBot struct {
+	bot                                   *telego.Bot
 	Sender                                *messaging.TelegramSender
 	LogsReader                            nukiapi.LogsReader
 	SmartlockReader                       nukiapi.SmartlockReader
@@ -34,27 +37,27 @@ func NewNukiBot(sender *messaging.TelegramSender,
 	smartlockReader nukiapi.SmartlockReader,
 	reservationsReader nukiapi.ReservationsReader,
 	smartlockAuthReader nukiapi.SmartlockAuthReader,
-	filters ...FilterFunc) NukiBot {
+	filters ...FilterFunc) (NukiBot, error) {
 
+	bot, err := telego.NewBot(sender.Token)
+	if err != nil {
+		return nil, err
+	}
 	resaTimeModifier := nukiapi.ReservationTimeModifier{
 		APICaller: nukiapi.APICaller{Token: reservationsReader.Token},
 		AddressID: reservationsReader.AddressID,
 	}
+	resaPendingModifRoutine := tgbroutine.NewReservationPendingModificationRoutine(reservationsReader, resaTimeModifier)
 	return &nukiBot{
-		Sender:              sender,
-		LogsReader:          logsReader,
-		SmartlockReader:     smartlockReader,
-		ReservationsReader:  reservationsReader,
-		SmartlockAuthReader: smartlockAuthReader,
-		filters:             filters,
-		reservationPendingModificationRoutine: tgbroutine.NewReservationPendingModificationRoutine(
-			reservationsReader,
-			resaTimeModifier,
-			func(e error) {
-				log.Error().Err(e).Msg("An error occurred processing pending reservations")
-			},
-		),
-	}
+		bot:                                   bot,
+		Sender:                                sender,
+		LogsReader:                            logsReader,
+		SmartlockReader:                       smartlockReader,
+		ReservationsReader:                    reservationsReader,
+		SmartlockAuthReader:                   smartlockAuthReader,
+		filters:                               filters,
+		reservationPendingModificationRoutine: resaPendingModifRoutine,
+	}, nil
 }
 
 func (b *nukiBot) AddFilter(f FilterFunc) {
@@ -62,6 +65,29 @@ func (b *nukiBot) AddFilter(f FilterFunc) {
 }
 
 func (b *nukiBot) Start() error {
+	b.reservationPendingModificationRoutine.AddOnErrorListener(func(rpm *model.ReservationPendingModification, e error) {
+		log.Error().Err(e).Msg("An error occurred processing pending modifications")
+		if rpm != nil {
+			b.bot.SendMessage(tu.Message(tu.ID(rpm.FromChatID), fmt.Sprintf("An error occurred processing pending modification, err=%v", e)))
+		}
+	})
+
+	b.reservationPendingModificationRoutine.AddOnModificationDoneListener(func(rpm *model.ReservationPendingModification) {
+		if rpm == nil {
+			log.Warn().Msgf("onModificationListener callback called with a nil modification")
+		}
+		log.Debug().
+			Str("ref", rpm.ReservationID).
+			Str("check_in", rpm.FormatCheckIn()).
+			Str("check_out", rpm.FormatCheckOut()).
+			Msg("Pending modification done")
+		b.bot.SendMessage(
+			tu.Message(
+				tu.ID(rpm.FromChatID),
+				fmt.Sprintf("Pending modification done for %s (%s -> %s)", rpm.ReservationID, rpm.FormatCheckIn(), rpm.FormatCheckOut())),
+		)
+	})
+
 	commands := Commands{}
 	help := func(update telego.Update, msg *telego.SendMessageParams) {
 		keys := maps.Keys(commands)
