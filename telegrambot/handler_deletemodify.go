@@ -40,8 +40,8 @@ func (bot nukiBot) fsmEventDeleteModifyDefault(ctx context.Context, e *fsm.Event
 	var keyboardButtons []telego.InlineKeyboardButton
 	for _, modif := range modifs {
 		keyboardButtons = append(keyboardButtons,
-			tu.InlineKeyboardButton(fmt.Sprintf("%s (%s - %s)", modif.ReservationID, modif.FormatCheckIn(), modif.FormatCheckOut())).
-				WithCallbackData(NewCallbackData("resa_received", modif.ReservationID)))
+			tu.InlineKeyboardButton(fmt.Sprintf("%s (%s - %s)", modif.ReservationRef, modif.FormatCheckIn(), modif.FormatCheckOut())).
+				WithCallbackData(NewCallbackData("resa_received", modif.ReservationRef)))
 	}
 
 	msg.ReplyMarkup = tu.InlineKeyboard(keyboardButtons)

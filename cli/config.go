@@ -2,11 +2,17 @@ package cli
 
 import (
 	"fmt"
+	"reflect"
+	"time"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/spf13/viper"
 )
+
+// TimeHourMinute is a time.Time representing only hours and minutes
+type TimeHourMinute time.Time
 
 type Config struct {
 	SmartlockID  int64          `mapstructure:"smartlock_id"`
@@ -14,9 +20,11 @@ type Config struct {
 	AddressID    int64          `mapstructure:"address_id"`
 	Senders      []SenderConfig `mapstructure:"senders"`
 	TelegramBot  struct {
-		Enabled           bool    `mapstructure:"enabled"`
-		SenderName        string  `mapstructure:"sender_name"`
-		RestrictToChatIDs []int64 `mapstructure:"restrict_private_chat_ids"`
+		Enabled           bool           `mapstructure:"enabled"`
+		SenderName        string         `mapstructure:"sender_name"`
+		DefaultCheckIn    TimeHourMinute `mapstructure:"default_check_in"`
+		DefaultCheckOut   TimeHourMinute `mapstructure:"default_check_out"`
+		RestrictToChatIDs []int64        `mapstructure:"restrict_private_chat_ids"`
 	} `mapstructure:"telegram_bot"`
 	LogsReader          nukiapi.LogsReader          `mapstructure:"-"`
 	SmartlockReader     nukiapi.SmartlockReader     `mapstructure:"-"`
@@ -73,7 +81,14 @@ func (c *Config) LoadConfig(vi *viper.Viper) error {
 		return err
 	}
 
-	if err := vi.Unmarshal(c); err != nil {
+	decoderConfigOpt := viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToTimeDurationHookFunc(),
+			mapstructure.StringToSliceHookFunc(","),
+			StringToTimeHourMinuteHookFunc(),
+		),
+	)
+	if err := vi.Unmarshal(c, decoderConfigOpt); err != nil {
 		return err
 	}
 	c.initReaders()
@@ -88,4 +103,22 @@ func (c *Config) GetSender(name string) (messaging.Sender, error) {
 		}
 	}
 	return nil, fmt.Errorf("unable to find sender %s", name)
+}
+
+func StringToTimeHourMinuteHookFunc() mapstructure.DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+		if t != reflect.TypeOf(TimeHourMinute(time.Now())) {
+			return data, nil
+		}
+
+		// Convert it by parsing
+		ti, err := time.Parse("15:04", data.(string))
+		return TimeHourMinute(ti), err
+	}
 }

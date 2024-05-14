@@ -7,12 +7,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nmaupu/nuki-logger/cache"
 	"github.com/nmaupu/nuki-logger/model"
 	"github.com/nmaupu/nuki-logger/nukiapi"
 	"github.com/rs/zerolog/log"
 )
 
 var _ ReservationPendingModificationRoutine = (*reservationPendingModificationRoutine)(nil)
+
+const reservationPendingModificationRoutineCacheFile = "/tmp/nuki-logger-reservation-pending-modifications.cache"
 
 type ErrCannotGetReservationsFromAPI struct {
 	error
@@ -22,7 +25,7 @@ type ReservationPendingModificationRoutine interface {
 	Start(checkInterval time.Duration)
 	AddPendingModification(r model.ReservationPendingModification)
 	GetAllPendingModifications() []model.ReservationPendingModification
-	DeletePendingModification(resaID string)
+	DeletePendingModification(resaRef string)
 	AddOnErrorListener(func(rpm *model.ReservationPendingModification, err error))
 	AddOnModificationDoneListener(func(rpm *model.ReservationPendingModification))
 }
@@ -49,13 +52,17 @@ func NewReservationPendingModificationRoutine(reader nukiapi.ReservationsReader,
 }
 
 func (r *reservationPendingModificationRoutine) AddPendingModification(resa model.ReservationPendingModification) {
+	resa.LastUpdateTime = time.Now()
 	r.messages <- resa
 }
 
-func (r *reservationPendingModificationRoutine) DeletePendingModification(resaID string) {
+func (r *reservationPendingModificationRoutine) DeletePendingModification(resaRef string) {
 	r.mutexRPM.Lock()
 	defer r.mutexRPM.Unlock()
-	delete(r.pendings, resaID)
+	delete(r.pendings, resaRef)
+	if err := r.saveCacheToDisk(); err != nil {
+		log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
+	}
 }
 
 func (r *reservationPendingModificationRoutine) GetAllPendingModifications() []model.ReservationPendingModification {
@@ -86,9 +93,28 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 		signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 		ticker := time.NewTicker(checkInterval)
 		defer ticker.Stop()
+		tickerTimeoutDoneChecker := time.NewTicker(time.Hour * 2)
+		defer tickerTimeoutDoneChecker.Stop()
+
+		if err := r.loadCacheFromDisk(); err != nil {
+			log.Error().Err(err).Msg("Unable to load pending reservations cache from disk")
+		}
 
 		for {
 			select {
+			case <-tickerTimeoutDoneChecker.C: // Check for done pending reservations to delete
+				r.mutexRPM.Lock()
+				for resaRef, pending := range r.pendings {
+					if pending.ModificationDone &&
+						!pending.LastUpdateTime.IsZero() &&
+						time.Since(pending.LastUpdateTime) > model.TimeoutReservationPendingModificationDoneDuration {
+						delete(r.pendings, resaRef)
+					}
+				}
+				if err := r.saveCacheToDisk(); err != nil {
+					log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
+				}
+				r.mutexRPM.Unlock()
 			case <-ticker.C: // Check for all pending modifications not done yet
 				log.Info().Msg("Processing pending reservations")
 
@@ -116,6 +142,7 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 							continue
 						}
 						pendingResa.ModificationDone = true
+						pendingResa.LastUpdateTime = time.Now()
 						linkedResa := resa
 						pendingResa.LinkedReservation = &linkedResa
 						r.dispatchModificationDoneToListeners(pendingResa)
@@ -127,7 +154,10 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 					Object("pending_resa", msg).
 					Msg("Adding resa to pending list")
 				r.mutexRPM.Lock()
-				r.pendings[msg.ReservationID] = &msg
+				r.pendings[msg.ReservationRef] = &msg
+				if err := r.saveCacheToDisk(); err != nil {
+					log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
+				}
 				r.mutexRPM.Unlock()
 			case <-interrupt:
 				log.Info().Msg("Stopping reservation pending modification routine")
@@ -155,4 +185,15 @@ func (r *reservationPendingModificationRoutine) dispatchModificationDoneToListen
 			fn(rpm)
 		}
 	}
+}
+
+func (r *reservationPendingModificationRoutine) saveCacheToDisk() error {
+	return cache.SaveCacheToDisk(r.pendings, reservationPendingModificationRoutineCacheFile)
+}
+
+func (r *reservationPendingModificationRoutine) loadCacheFromDisk() error {
+	if r.pendings == nil {
+		r.pendings = make(map[string]*model.ReservationPendingModification)
+	}
+	return cache.LoadCacheFromDisk(reservationPendingModificationRoutineCacheFile, &r.pendings)
 }

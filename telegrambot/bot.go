@@ -30,6 +30,8 @@ type nukiBot struct {
 	SmartlockAuthReader                   nukiapi.SmartlockAuthReader
 	filters                               []FilterFunc
 	reservationPendingModificationRoutine tgbroutine.ReservationPendingModificationRoutine
+	DefaultCheckIn                        time.Time
+	DefaultCheckOut                       time.Time
 }
 
 func NewNukiBot(sender *messaging.TelegramSender,
@@ -37,6 +39,8 @@ func NewNukiBot(sender *messaging.TelegramSender,
 	smartlockReader nukiapi.SmartlockReader,
 	reservationsReader nukiapi.ReservationsReader,
 	smartlockAuthReader nukiapi.SmartlockAuthReader,
+	defaultCheckIn time.Time,
+	defaultCheckOut time.Time,
 	filters ...FilterFunc) (NukiBot, error) {
 
 	bot, err := telego.NewBot(sender.Token)
@@ -57,6 +61,8 @@ func NewNukiBot(sender *messaging.TelegramSender,
 		SmartlockAuthReader:                   smartlockAuthReader,
 		filters:                               filters,
 		reservationPendingModificationRoutine: resaPendingModifRoutine,
+		DefaultCheckIn:                        defaultCheckIn,
+		DefaultCheckOut:                       defaultCheckOut,
 	}, nil
 }
 
@@ -68,23 +74,24 @@ func (b *nukiBot) Start() error {
 	b.reservationPendingModificationRoutine.AddOnErrorListener(func(rpm *model.ReservationPendingModification, e error) {
 		log.Error().Err(e).Msg("An error occurred processing pending modifications")
 		if rpm != nil {
-			b.bot.SendMessage(tu.Message(tu.ID(rpm.FromChatID), fmt.Sprintf("An error occurred processing pending modification, err=%v", e)))
+			_, _ = b.bot.SendMessage(tu.Message(tu.ID(rpm.FromChatID), fmt.Sprintf("An error occurred processing pending modification, err=%v", e)))
 		}
 	})
 
 	b.reservationPendingModificationRoutine.AddOnModificationDoneListener(func(rpm *model.ReservationPendingModification) {
 		if rpm == nil {
 			log.Warn().Msgf("onModificationListener callback called with a nil modification")
+			return
 		}
+
 		log.Debug().
-			Str("ref", rpm.ReservationID).
+			Str("ref", rpm.ReservationRef).
 			Str("check_in", rpm.FormatCheckIn()).
 			Str("check_out", rpm.FormatCheckOut()).
 			Msg("Pending modification done")
-		b.bot.SendMessage(
-			tu.Message(
-				tu.ID(rpm.FromChatID),
-				fmt.Sprintf("Pending modification done for %s (%s -> %s)", rpm.ReservationID, rpm.FormatCheckIn(), rpm.FormatCheckOut())),
+		_, _ = b.bot.SendMessage(tu.Message(
+			tu.ID(rpm.FromChatID),
+			fmt.Sprintf("Pending modification done for %s (%s -> %s)", rpm.ReservationRef, rpm.FormatCheckIn(), rpm.FormatCheckOut())),
 		)
 	})
 

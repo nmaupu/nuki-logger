@@ -25,7 +25,7 @@ func (b *nukiBot) handlerListModify(update telego.Update, msg *telego.SendMessag
 		if v.ModificationDone {
 			em = emoji.CheckMark.String()
 		}
-		strs = append(strs, fmt.Sprintf("*%s*: %s - %s %s", v.ReservationID, v.FormatCheckIn(), v.FormatCheckOut(), em))
+		strs = append(strs, fmt.Sprintf("*%s*: %s - %s %s", v.ReservationRef, v.FormatCheckIn(), v.FormatCheckOut(), em))
 	}
 
 	msg.ParseMode = telego.ModeMarkdown

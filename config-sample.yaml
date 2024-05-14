@@ -5,6 +5,8 @@ nuki_api_token: token
 telegram_bot:
   enabled: true
   sender_name: telegram
+  default_check_in: 15:00
+  default_check_out: 11:00
   restrict_private_chat_ids:
     - 12345
     - 67890

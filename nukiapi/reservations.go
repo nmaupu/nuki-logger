@@ -99,7 +99,7 @@ func (r ReservationTimeModifier) Execute(resaID string, checkIn int32, checkOut 
 
 	body, err := r.execAPIPost(requestURL, bodyJSON)
 	if err != nil {
-		return fmt.Errorf("Unable to send request, err=%v, body=%s", err, string(body))
+		return fmt.Errorf("unable to send request: %w, body=%s", err, string(body))
 	}
 
 	return nil

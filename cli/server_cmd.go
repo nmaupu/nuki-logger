@@ -36,7 +36,6 @@ var (
 func init() {
 	ServerCmd.Flags().DurationP(FlagServerInterval, "i", time.Second*60, "Interval at which to check new logs")
 	_ = viper.BindPFlags(ServerCmd.Flags())
-
 }
 
 func RunServer(_ *cobra.Command, _ []string) error {
@@ -47,7 +46,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	log.Info().Msg("Reading old log responses from cache")
-	cacheLogs, err := cache.LoadCacheFromDisk()
+	cacheLogs, err := cache.LoadCacheNukiSmartlockLogsFromDisk()
 	if err != nil {
 		return err
 	}
@@ -58,7 +57,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		if err := cache.SaveCacheToDisk(cacheLogs); err != nil {
+		if err := cache.SaveCacheNukiSmartlockLogsToDisk(cacheLogs); err != nil {
 			return err
 		}
 	}
@@ -69,11 +68,16 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			return err
 		}
 		tgSender := tgSenderInterface.(*messaging.TelegramSender)
+		defCheckIn := config.TelegramBot.DefaultCheckIn
+		defCheckOut := config.TelegramBot.DefaultCheckOut
 		nukiBot, err := telegrambot.NewNukiBot(tgSender,
 			config.LogsReader,
 			config.SmartlockReader,
 			config.ReservationsReader,
-			config.SmartlockAuthReader)
+			config.SmartlockAuthReader,
+			time.Time(defCheckIn),
+			time.Time(defCheckOut),
+		)
 		if err != nil {
 			return err
 		}
@@ -162,7 +166,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 					}
 
 					cacheLogs = newResponses
-					if err := cache.SaveCacheToDisk(cacheLogs); err != nil {
+					if err := cache.SaveCacheNukiSmartlockLogsToDisk(cacheLogs); err != nil {
 						log.Error().Err(err).Msg("Unable to save cache file to disk")
 					}
 				}

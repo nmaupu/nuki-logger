@@ -63,14 +63,14 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 				}
 
 				e.FSM.SetMetadata(metadataPendingModif, &model.ReservationPendingModification{
-					ReservationID: data,
-					FromChatID:    update.Message.From.ID,
+					ReservationRef: data,
+					FromChatID:     update.Message.From.ID,
 				})
 			},
 			"wait_check_in": func(ctx context.Context, e *fsm.Event) {
 				log.Debug().Str("callback", "wait_check_in").Msg("Callback called")
 				msg := reinitMetadataMessage(e.FSM)
-				msg.Text = fmt.Sprintf("Enter check-in time (format: %s)", model.FormatTimeHoursMinutes)
+				msg.Text = fmt.Sprintf("Enter check-in time (default: %s)", bot.DefaultCheckIn.Format(model.FormatTimeHoursMinutes))
 				waitForUserInput(e.FSM, "check_in_received")
 			},
 			"before_check_in_received": func(ctx context.Context, e *fsm.Event) {
@@ -95,7 +95,7 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 			"wait_check_out": func(ctx context.Context, e *fsm.Event) {
 				log.Debug().Str("callback", "wait_check_out").Msg("Callback called")
 				msg := reinitMetadataMessage(e.FSM)
-				msg.Text = fmt.Sprintf("Enter check-out time (format: %s)", model.FormatTimeHoursMinutes)
+				msg.Text = fmt.Sprintf("Enter check-out time (default: %s)", bot.DefaultCheckOut.Format(model.FormatTimeHoursMinutes))
 				waitForUserInput(e.FSM, "check_out_received")
 			},
 			"before_check_out_received": func(ctx context.Context, e *fsm.Event) {
@@ -137,7 +137,7 @@ func (bot nukiBot) fsmModifyCommand() *fsm.FSM {
 				msg.ReplyMarkup = keyboard
 				msg.ParseMode = telego.ModeMarkdown
 				m := fmt.Sprintf("%s Do you confirm?\n", emoji.OpenBook.String())
-				m += fmt.Sprintf("*Reservation*: %s\n", modif.ReservationID)
+				m += fmt.Sprintf("*Reservation*: %s\n", modif.ReservationRef)
 				m += fmt.Sprintf("*Check-in*: %s\n", modif.FormatCheckIn())
 				m += fmt.Sprintf("*Check-out*: %s", modif.FormatCheckOut())
 				msg.Text = m
