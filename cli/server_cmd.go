@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"slices"
@@ -100,6 +102,18 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	}
 
 	wg := sync.WaitGroup{}
+	if config.HealthCheckPort > 0 {
+		go func() {
+			log.Info().Int("port", config.HealthCheckPort).Msg("Starting health check service")
+			http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, "ok")
+			})
+			if err := http.ListenAndServe(fmt.Sprintf(":%d", config.HealthCheckPort), nil); err != nil {
+				log.Panic().Err(err).Int("port", config.HealthCheckPort).Msg("Unable to start health check service")
+			}
+		}()
+	}
 	wg.Add(1)
 	go func() {
 		for {

@@ -2,6 +2,7 @@
 address_id: 12345
 smartlock_id: 12345
 nuki_api_token: token
+health_check_port: 8080
 telegram_bot:
   enabled: true
   sender_name: telegram

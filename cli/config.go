@@ -26,6 +26,7 @@ type Config struct {
 		DefaultCheckOut   TimeHourMinute `mapstructure:"default_check_out"`
 		RestrictToChatIDs []int64        `mapstructure:"restrict_private_chat_ids"`
 	} `mapstructure:"telegram_bot"`
+	HealthCheckPort     int                         `mapstructure:"health_check_port"`
 	LogsReader          nukiapi.LogsReader          `mapstructure:"-"`
 	SmartlockReader     nukiapi.SmartlockReader     `mapstructure:"-"`
 	SmartlockAuthReader nukiapi.SmartlockAuthReader `mapstructure:"-"`
