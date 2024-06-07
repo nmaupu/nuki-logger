@@ -1,12 +1,14 @@
 package routine
 
 import (
+	"errors"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/nmaupu/nuki-logger/cache"
 	"github.com/nmaupu/nuki-logger/model"
 	"github.com/nmaupu/nuki-logger/nukiapi"
@@ -15,7 +17,9 @@ import (
 
 var _ ReservationPendingModificationRoutine = (*reservationPendingModificationRoutine)(nil)
 
-const reservationPendingModificationRoutineCacheFile = "/tmp/nuki-logger-reservation-pending-modifications.cache"
+const (
+	reservationPendingModificationCacheKey = "reservation-pending-modification"
+)
 
 type ErrCannotGetReservationsFromAPI struct {
 	error
@@ -31,6 +35,7 @@ type ReservationPendingModificationRoutine interface {
 }
 
 type reservationPendingModificationRoutine struct {
+	cache                       cache.Cache
 	pendings                    map[string]*model.ReservationPendingModification
 	messages                    chan model.ReservationPendingModification
 	mutexRPM                    sync.Mutex
@@ -41,8 +46,12 @@ type reservationPendingModificationRoutine struct {
 	onModificationDoneListeners []func(rpm *model.ReservationPendingModification)
 }
 
-func NewReservationPendingModificationRoutine(reader nukiapi.ReservationsReader, writer nukiapi.ReservationTimeModifier) *reservationPendingModificationRoutine {
+func NewReservationPendingModificationRoutine(
+	reader nukiapi.ReservationsReader,
+	writer nukiapi.ReservationTimeModifier,
+	cache cache.Cache) *reservationPendingModificationRoutine {
 	return &reservationPendingModificationRoutine{
+		cache:                   cache,
 		pendings:                make(map[string]*model.ReservationPendingModification),
 		messages:                make(chan model.ReservationPendingModification),
 		mutexRPM:                sync.Mutex{},
@@ -60,7 +69,7 @@ func (r *reservationPendingModificationRoutine) DeletePendingModification(resaRe
 	r.mutexRPM.Lock()
 	defer r.mutexRPM.Unlock()
 	delete(r.pendings, resaRef)
-	if err := r.saveCacheToDisk(); err != nil {
+	if err := r.saveToCache(); err != nil {
 		log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
 	}
 }
@@ -96,7 +105,7 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 		tickerTimeoutDoneChecker := time.NewTicker(time.Hour * 2)
 		defer tickerTimeoutDoneChecker.Stop()
 
-		if err := r.loadCacheFromDisk(); err != nil {
+		if err := r.loadFromCache(); err != nil {
 			log.Error().Err(err).Msg("Unable to load pending reservations cache from disk")
 		}
 
@@ -111,7 +120,7 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 						delete(r.pendings, resaRef)
 					}
 				}
-				if err := r.saveCacheToDisk(); err != nil {
+				if err := r.saveToCache(); err != nil {
 					log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
 				}
 				r.mutexRPM.Unlock()
@@ -155,7 +164,7 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 					Msg("Adding resa to pending list")
 				r.mutexRPM.Lock()
 				r.pendings[msg.ReservationRef] = &msg
-				if err := r.saveCacheToDisk(); err != nil {
+				if err := r.saveToCache(); err != nil {
 					log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
 				}
 				r.mutexRPM.Unlock()
@@ -187,13 +196,29 @@ func (r *reservationPendingModificationRoutine) dispatchModificationDoneToListen
 	}
 }
 
-func (r *reservationPendingModificationRoutine) saveCacheToDisk() error {
-	return cache.SaveCacheToDisk(r.pendings, reservationPendingModificationRoutineCacheFile)
+func (r *reservationPendingModificationRoutine) saveToCache() error {
+	if r.cache == nil {
+		return cache.ErrCacheNoClient
+	}
+	return r.cache.Save(reservationPendingModificationCacheKey, r.pendings)
 }
 
-func (r *reservationPendingModificationRoutine) loadCacheFromDisk() error {
+func (r *reservationPendingModificationRoutine) loadFromCache() error {
+	if r.cache == nil {
+		return cache.ErrCacheNoClient
+	}
+
 	if r.pendings == nil {
 		r.pendings = make(map[string]*model.ReservationPendingModification)
 	}
-	return cache.LoadCacheFromDisk(reservationPendingModificationRoutineCacheFile, &r.pendings)
+
+	err := r.cache.Load(reservationPendingModificationCacheKey, &r.pendings)
+	switch {
+	case errors.Is(err, memcache.ErrCacheMiss):
+		return nil
+	case errors.Is(err, memcache.ErrNoServers):
+		return nil
+	default:
+		return err
+	}
 }

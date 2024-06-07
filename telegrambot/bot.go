@@ -8,6 +8,7 @@ import (
 
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
+	"github.com/nmaupu/nuki-logger/cache"
 	"github.com/nmaupu/nuki-logger/messaging"
 	"github.com/nmaupu/nuki-logger/model"
 	"github.com/nmaupu/nuki-logger/nukiapi"
@@ -41,6 +42,7 @@ func NewNukiBot(sender *messaging.TelegramSender,
 	smartlockAuthReader nukiapi.SmartlockAuthReader,
 	defaultCheckIn time.Time,
 	defaultCheckOut time.Time,
+	cache cache.Cache,
 	filters ...FilterFunc) (NukiBot, error) {
 
 	bot, err := telego.NewBot(sender.Token)
@@ -51,7 +53,7 @@ func NewNukiBot(sender *messaging.TelegramSender,
 		APICaller: nukiapi.APICaller{Token: reservationsReader.Token},
 		AddressID: reservationsReader.AddressID,
 	}
-	resaPendingModifRoutine := tgbroutine.NewReservationPendingModificationRoutine(reservationsReader, resaTimeModifier)
+	resaPendingModifRoutine := tgbroutine.NewReservationPendingModificationRoutine(reservationsReader, resaTimeModifier, cache)
 	return &nukiBot{
 		bot:                                   bot,
 		Sender:                                sender,

@@ -7,7 +7,7 @@ LDFLAGS = -ldflags="-X '$(PKG_NAME)/cli.ApplicationVersion=$(TAG_NAME)' -X '$(PK
 
 all: $(BIN)/$(BIN_NAME)
 
-$(BIN)/$(BIN_NAME): $(BIN) *.go */*.go */*.go
+$(BIN)/$(BIN_NAME): $(BIN) *.go */*.go */*/*.go
 	go build -o $(BIN)/$(BIN_NAME) $(LDFLAGS)
 
 .PHONY: release

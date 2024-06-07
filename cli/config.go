@@ -27,6 +27,7 @@ type Config struct {
 		RestrictToChatIDs []int64        `mapstructure:"restrict_private_chat_ids"`
 	} `mapstructure:"telegram_bot"`
 	HealthCheckPort     int                         `mapstructure:"health_check_port"`
+	MemcachedServers    []string                    `mapstructure:"memcached_servers"`
 	LogsReader          nukiapi.LogsReader          `mapstructure:"-"`
 	SmartlockReader     nukiapi.SmartlockReader     `mapstructure:"-"`
 	SmartlockAuthReader nukiapi.SmartlockAuthReader `mapstructure:"-"`

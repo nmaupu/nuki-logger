@@ -33,6 +33,7 @@ var (
 		SilenceErrors: true,
 		RunE:          RunServer,
 	}
+	cacheEnabled = false
 )
 
 func init() {
@@ -52,20 +53,35 @@ func RunServer(_ *cobra.Command, _ []string) error {
 	interruptSigChan := make(chan os.Signal, 1)
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Info().Msg("Reading old log responses from cache")
-	cacheLogs, err := cache.LoadCacheNukiSmartlockLogsFromDisk()
-	if err != nil {
-		return err
+	// cache init
+	var memcache cache.Cache
+	if len(config.MemcachedServers) == 0 {
+		log.Warn().Msg("no cache server configured, cannot retain information over restarts")
+		cacheEnabled = false
+	} else {
+		memcache = cache.NewMemcached(config.MemcachedServers)
+		cacheEnabled = true
 	}
-	if len(cacheLogs) == 0 {
-		// No cache, creating one
-		log.Info().Msg("No cache yet, creating one")
-		cacheLogs, err := config.LogsReader.Execute()
+
+	cacheLogs := []model.NukiSmartlockLogResponse{}
+	memcacheLogs := CacheNukiSmartlockLogs{Client: memcache}
+	if cacheEnabled {
+		log.Info().Msg("Reading old log responses from cache")
+		var err error
+		cacheLogs, err = memcacheLogs.Load()
 		if err != nil {
 			return err
 		}
-		if err := cache.SaveCacheNukiSmartlockLogsToDisk(cacheLogs); err != nil {
-			return err
+		if len(cacheLogs) == 0 {
+			// No cache, creating one
+			log.Info().Msg("No cache yet, creating one")
+			cacheLogs, err := config.LogsReader.Execute()
+			if err != nil {
+				return err
+			}
+			if err := memcacheLogs.Save(cacheLogs); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -84,6 +100,7 @@ func RunServer(_ *cobra.Command, _ []string) error {
 			config.SmartlockAuthReader,
 			time.Time(defCheckIn),
 			time.Time(defCheckOut),
+			memcache,
 		)
 		if err != nil {
 			return err
@@ -203,8 +220,10 @@ func RunServer(_ *cobra.Command, _ []string) error {
 					}
 
 					cacheLogs = newResponses
-					if err := cache.SaveCacheNukiSmartlockLogsToDisk(cacheLogs); err != nil {
-						log.Error().Err(err).Msg("Unable to save cache file to disk")
+					if cacheEnabled {
+						if err := memcacheLogs.Save(cacheLogs); err != nil {
+							log.Error().Err(err).Msg("Unable to save cache file to disk")
+						}
 					}
 				}
 			case <-interruptSigChan:
