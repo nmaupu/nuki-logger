@@ -43,6 +43,11 @@ func init() {
 func RunServer(_ *cobra.Command, _ []string) error {
 	log.Debug().Dur(FlagServerInterval, viper.GetDuration(FlagServerInterval)).Send()
 	tickerLogs := time.NewTicker(viper.GetDuration(FlagServerInterval))
+	// NOTE: Nuki logs API bug: sometimes, logs endpoint does not return the last logs entries
+	// as a result, there is a diff and logs are resent over to senders...
+	// To avoid that, we store the last log date at each call and sent
+	// logs over only when the last date received is AFTER this var
+	var lastLogDate time.Time
 	tickerSmartlock := time.NewTicker(SmartlockCheckInterval)
 	interruptSigChan := make(chan os.Signal, 1)
 	signal.Notify(interruptSigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -145,6 +150,24 @@ func RunServer(_ *cobra.Command, _ []string) error {
 				newResponses, err := config.LogsReader.Execute()
 				if err != nil {
 					log.Error().Err(err).Msg("An error occurred getting logs from API")
+				}
+
+				if len(newResponses) > 0 {
+					// init date with the last one if needed
+					newRespDate := newResponses[0].Date
+					if lastLogDate.IsZero() {
+						lastLogDate = newRespDate
+					}
+					if newRespDate.Before(lastLogDate) {
+						// Nuki api bug, do not send anything
+						log.Warn().
+							Time("last_log", lastLogDate).
+							Time("api_log", newRespDate).
+							Msg("Nuki logs api bug: missing last logs entries, ignoring.")
+
+						continue
+					}
+					lastLogDate = newRespDate
 				}
 
 				diff := model.Diff(newResponses, cacheLogs)
