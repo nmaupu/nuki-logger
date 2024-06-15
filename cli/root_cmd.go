@@ -52,6 +52,8 @@ var (
 			}
 
 			if viper.GetString(PersistentFlagConfig) != "" {
+				viper.AddConfigPath(".")
+				viper.SetConfigType("yaml")
 				viper.SetConfigName(viper.GetString(PersistentFlagConfig))
 			}
 
