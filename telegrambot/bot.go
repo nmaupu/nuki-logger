@@ -136,6 +136,8 @@ func (b *nukiBot) Start() error {
 
 	commands["/deletemodify"] = Command{StateMachine: b.fsmDeleteModifyCommand()}
 
+	commands["/savemodify"] = Command{Handler: b.handlerSavePendingReservationsToCache}
+
 	b.reservationPendingModificationRoutine.Start(time.Minute * 10)
 	return commands.start(b)
 }

@@ -32,6 +32,7 @@ type ReservationPendingModificationRoutine interface {
 	DeletePendingModification(resaRef string)
 	AddOnErrorListener(func(rpm *model.ReservationPendingModification, err error))
 	AddOnModificationDoneListener(func(rpm *model.ReservationPendingModification))
+	SaveToCache() error
 }
 
 type reservationPendingModificationRoutine struct {
@@ -69,7 +70,7 @@ func (r *reservationPendingModificationRoutine) DeletePendingModification(resaRe
 	r.mutexRPM.Lock()
 	defer r.mutexRPM.Unlock()
 	delete(r.pendings, resaRef)
-	if err := r.saveToCache(); err != nil {
+	if err := r.SaveToCache(); err != nil {
 		log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
 	}
 }
@@ -120,7 +121,7 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 						delete(r.pendings, resaRef)
 					}
 				}
-				if err := r.saveToCache(); err != nil {
+				if err := r.SaveToCache(); err != nil {
 					log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
 				}
 				r.mutexRPM.Unlock()
@@ -164,8 +165,9 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 					Msg("Adding resa to pending list")
 				r.mutexRPM.Lock()
 				r.pendings[msg.ReservationRef] = &msg
-				if err := r.saveToCache(); err != nil {
+				if err := r.SaveToCache(); err != nil {
 					log.Error().Err(err).Msg("Unable to save pending modification cache to disk")
+					r.dispatchErrorsToListeners(&msg, err)
 				}
 				r.mutexRPM.Unlock()
 			case <-interrupt:
@@ -196,7 +198,7 @@ func (r *reservationPendingModificationRoutine) dispatchModificationDoneToListen
 	}
 }
 
-func (r *reservationPendingModificationRoutine) saveToCache() error {
+func (r *reservationPendingModificationRoutine) SaveToCache() error {
 	if r.cache == nil {
 		return cache.ErrCacheNoClient
 	}
