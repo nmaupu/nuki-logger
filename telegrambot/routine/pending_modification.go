@@ -33,6 +33,7 @@ type ReservationPendingModificationRoutine interface {
 	AddOnErrorListener(func(rpm *model.ReservationPendingModification, err error))
 	AddOnModificationDoneListener(func(rpm *model.ReservationPendingModification))
 	SaveToCache() error
+	ApplyModificationNow()
 }
 
 type reservationPendingModificationRoutine struct {
@@ -45,6 +46,7 @@ type reservationPendingModificationRoutine struct {
 	mutexListeners              sync.Mutex
 	onErrorListeners            []func(rpm *model.ReservationPendingModification, err error)
 	onModificationDoneListeners []func(rpm *model.ReservationPendingModification)
+	applyNowChan                chan bool
 }
 
 func NewReservationPendingModificationRoutine(
@@ -58,6 +60,7 @@ func NewReservationPendingModificationRoutine(
 		mutexRPM:                sync.Mutex{},
 		reservationReader:       reader,
 		reservationTimeModifier: writer,
+		applyNowChan:            make(chan bool),
 	}
 }
 
@@ -97,6 +100,10 @@ func (r *reservationPendingModificationRoutine) AddOnModificationDoneListener(f 
 	r.onModificationDoneListeners = append(r.onModificationDoneListeners, f)
 }
 
+func (r *reservationPendingModificationRoutine) ApplyModificationNow() {
+	r.applyNowChan <- true
+}
+
 func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duration) {
 	go func() {
 		interrupt := make(chan os.Signal, 1)
@@ -126,39 +133,9 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 				}
 				r.mutexRPM.Unlock()
 			case <-ticker.C: // Check for all pending modifications not done yet
-				log.Info().Msg("Processing pending reservations")
-
-				// Get all reservations from API
-				allResas, err := r.reservationReader.Execute()
-				if err != nil {
-					r.dispatchErrorsToListeners(nil, ErrCannotGetReservationsFromAPI{err})
-				}
-
-				// Getting all pending modifications and do the change
-				r.mutexRPM.Lock()
-				for _, resa := range allResas {
-					pendingResa, ok := r.pendings[resa.Reference]
-					if ok && !pendingResa.ModificationDone { // found one to process
-						log.Info().
-							Object("pending_resa", pendingResa).
-							Msg("Processing pending resa change")
-						err := r.reservationTimeModifier.Execute(
-							resa.ID,
-							model.MinutesFromMidnight(pendingResa.CheckInTime),
-							model.MinutesFromMidnight(pendingResa.CheckOutTime),
-						)
-						if err != nil {
-							r.dispatchErrorsToListeners(pendingResa, err)
-							continue
-						}
-						pendingResa.ModificationDone = true
-						pendingResa.LastUpdateTime = time.Now()
-						linkedResa := resa
-						pendingResa.LinkedReservation = &linkedResa
-						r.dispatchModificationDoneToListeners(pendingResa)
-					}
-				}
-				r.mutexRPM.Unlock()
+				r.apply()
+			case <-r.applyNowChan: // Apply all pending modifications now
+				r.apply()
 			case msg := <-r.messages: // New pending modification
 				log.Debug().
 					Object("pending_resa", msg).
@@ -176,6 +153,42 @@ func (r *reservationPendingModificationRoutine) Start(checkInterval time.Duratio
 			}
 		}
 	}()
+}
+
+func (r *reservationPendingModificationRoutine) apply() {
+	log.Info().Msg("Processing pending reservations")
+
+	// Get all reservations from API
+	allResas, err := r.reservationReader.Execute()
+	if err != nil {
+		r.dispatchErrorsToListeners(nil, ErrCannotGetReservationsFromAPI{err})
+	}
+
+	// Getting all pending modifications and do the change
+	r.mutexRPM.Lock()
+	for _, resa := range allResas {
+		pendingResa, ok := r.pendings[resa.Reference]
+		if ok && !pendingResa.ModificationDone { // found one to process
+			log.Info().
+				Object("pending_resa", pendingResa).
+				Msg("Processing pending resa change")
+			err := r.reservationTimeModifier.Execute(
+				resa.ID,
+				model.MinutesFromMidnight(pendingResa.CheckInTime),
+				model.MinutesFromMidnight(pendingResa.CheckOutTime),
+			)
+			if err != nil {
+				r.dispatchErrorsToListeners(pendingResa, err)
+				continue
+			}
+			pendingResa.ModificationDone = true
+			pendingResa.LastUpdateTime = time.Now()
+			linkedResa := resa
+			pendingResa.LinkedReservation = &linkedResa
+			r.dispatchModificationDoneToListeners(pendingResa)
+		}
+	}
+	r.mutexRPM.Unlock()
 }
 
 func (r *reservationPendingModificationRoutine) dispatchErrorsToListeners(rpm *model.ReservationPendingModification, e error) {

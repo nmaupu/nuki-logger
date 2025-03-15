@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (bot nukiBot) fsmNameCommand() *fsm.FSM {
+func (bot *nukiBot) fsmTestCommand() *fsm.FSM {
 	return fsm.NewFSM(
 		"idle",
 		fsm.Events{

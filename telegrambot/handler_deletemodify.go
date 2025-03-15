@@ -51,7 +51,7 @@ func (bot nukiBot) fsmEventDeleteModifyDefault(ctx context.Context, e *fsm.Event
 
 }
 
-func (bot nukiBot) fsmEventDeleteModifyReceived(ctx context.Context, e *fsm.Event) {
+func (bot *nukiBot) fsmEventDeleteModifyReceived(ctx context.Context, e *fsm.Event) {
 	log.Debug().Str("callback", "resa_received").Msg("Callback called")
 	msg := reinitMetadataMessage(e.FSM)
 

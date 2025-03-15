@@ -98,45 +98,64 @@ func (b *nukiBot) Start() error {
 	})
 
 	commands := Commands{}
-	help := func(update telego.Update, msg *telego.SendMessageParams) {
+	handlerHelp := func(update telego.Update, msg *telego.SendMessageParams) {
 		keys := maps.Keys(commands)
 		helpItems := slices.DeleteFunc(keys, func(s string) bool { return !strings.HasPrefix(s, "/") })
-		msg.Text = fmt.Sprintf("The following commands are available: %s", strings.Join(helpItems, ", "))
+		elts := []string{}
+		for _, v := range helpItems {
+			if v == "/test" {
+				continue
+			}
+			elts = append(elts, fmt.Sprintf("  - %s\t%s", v, commands[v].Description))
+		}
+		msg.Text = fmt.Sprintf("The following commands are available: \n%s",
+			strings.Join(elts, "\n"))
 	}
 
-	commands["/start"] = Command{Handler: help}
-	commands["/help"] = Command{Handler: help}
-	commands[menuHelp] = Command{Handler: help}
+	cmdHelp := Command{Handler: handlerHelp, Description: "Display help"}
+	commands["/start"] = cmdHelp
+	commands["/help"] = cmdHelp
+	commands[menuHelp] = cmdHelp
 
-	commands["/menu"] = Command{Handler: b.handlerMenu}
+	commands["/menu"] = Command{Handler: b.handlerMenu, Description: "Show the main menu"}
 
-	commands["/battery"] = Command{Handler: b.handlerBattery}
-	commands["/bat"] = Command{Handler: b.handlerBattery}
-	commands[menuBattery] = Command{Handler: b.handlerBattery}
+	cmdBat := Command{Handler: b.handlerBattery, Description: "Display battery details"}
+	commands["/battery"] = cmdBat
+	commands["/bat"] = cmdBat
+	commands[menuBattery] = cmdBat
 
-	commands["/resa"] = Command{Handler: b.handlerResa}
-	commands[menuResas] = Command{Handler: b.handlerResa}
+	cmdResa := Command{Handler: b.handlerResa, Description: "List all reservations"}
+	commands["/resa"] = cmdResa
+	commands[menuResas] = cmdResa
 
 	logsFSM := b.fsmLogsCommand()
-	commands["/logs"] = Command{StateMachine: logsFSM}
-	commands[menuLogs] = Command{StateMachine: logsFSM}
+	cmdLogs := Command{StateMachine: logsFSM, Description: "Display Nuki lock logs"}
+	commands["/logs"] = cmdLogs
+	commands[menuLogs] = cmdLogs
 
 	codeFSM := b.fsmCodeCommand()
-	commands["/code"] = Command{StateMachine: codeFSM}
-	commands[menuCode] = Command{StateMachine: codeFSM}
+	cmdCode := Command{StateMachine: codeFSM, Description: "Display a reservation door code"}
+	commands["/code"] = cmdCode
+	commands[menuCode] = cmdCode
 
-	commands["/name"] = Command{StateMachine: b.fsmNameCommand()}
+	commands["/version"] = Command{Handler: b.handlerVersion, Description: "Display bot version"}
 
 	modifyFSM := b.fsmModifyCommand()
-	commands["/modify"] = Command{StateMachine: modifyFSM}
-	commands[menuModify] = Command{StateMachine: modifyFSM}
+	cmdModify := Command{StateMachine: modifyFSM, Description: "Modify check-in/out of a specific reservation"}
+	commands["/modify"] = cmdModify
+	commands[menuModify] = cmdModify
 
-	commands["/listmodify"] = Command{Handler: b.handlerListModify}
-	commands[menuListModify] = Command{Handler: b.handlerListModify}
+	cmdListModify := Command{Handler: b.handlerListModify, Description: "List all pending modifications"}
+	commands["/listmodify"] = cmdListModify
+	commands[menuListModify] = cmdListModify
 
-	commands["/deletemodify"] = Command{StateMachine: b.fsmDeleteModifyCommand()}
+	commands["/deletemodify"] = Command{StateMachine: b.fsmDeleteModifyCommand(), Description: "Delete a pending modification"}
 
-	commands["/savemodify"] = Command{Handler: b.handlerSavePendingReservationsToCache}
+	commands["/savemodify"] = Command{Handler: b.handlerSavePendingReservationsToCache, Description: "Save all modifications to the cache"}
+
+	commands["/applymodify"] = Command{Handler: b.handlerApplyModify, Description: "Apply all pending modifications now"}
+
+	commands["/test"] = Command{StateMachine: b.fsmTestCommand()}
 
 	b.reservationPendingModificationRoutine.Start(time.Minute * 10)
 	return commands.start(b)

@@ -20,6 +20,7 @@ type Command struct {
 	StateMachine *fsm.FSM
 	NextFSMEvent string
 	Handler      CommandHandler
+	Description  string
 }
 
 func resetChatSession(chatID int64, cmd *Command) {
