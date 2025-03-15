@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mymmrac/telego"
+	tu "github.com/mymmrac/telego/telegoutil"
 )
 
 func (b *nukiBot) handlerResa(update telego.Update, msg *telego.SendMessageParams) {
@@ -33,4 +34,15 @@ func (b *nukiBot) handlerResa(update telego.Update, msg *telego.SendMessageParam
 	}
 	msg.ParseMode = telego.ModeMarkdown
 	msg.Text = fmt.Sprintf("Reservations:\n%s", strings.Join(lines, "\n"))
+
+	b.bot.SendMessage(&telego.SendMessageParams{
+		ChatID: tu.ID(update.Message.From.ID),
+		Text:   "Reservation IDs for easy copy/paste:",
+	})
+	for _, r := range res {
+		b.bot.SendMessage(&telego.SendMessageParams{
+			ChatID: tu.ID(update.Message.From.ID),
+			Text:   r.Reference,
+		})
+	}
 }
